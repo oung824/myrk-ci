@@ -61,6 +61,32 @@ function Write-PytestResult($Receipt) {
     $skipped = [int]$suite.GetAttribute('skipped')
     $passed = $tests - $failed - $errors - $skipped
     Write-CiSummary "- Pytest counts: $tests collected, $passed passed, $failed failed, $errors errors, $skipped skipped."
+    if ($Check -eq 'backend-executor' -and ($failed + $errors) -gt 0) {
+        $failureText = ($suite.SelectNodes('testcase/failure | testcase/error') | ForEach-Object { $_.InnerText }) -join "`n"
+        $locations = [regex]::Matches($failureText, '(?:tests[\\/]test_executor\.py|myrk[\\/]executor\.py):\d+') |
+            ForEach-Object Value | Select-Object -Unique
+        if ($locations) {
+            Write-CiSummary "- Executor failure frames: $($locations -join ', ')."
+        }
+        $conditions = [ordered]@{
+            'mxc-unavailable-or-failed' = '(?i)\b(?:mxc|windowsmxc)\b'
+            'access-denied' = '(?i)access (?:is )?denied|permissionerror|0x80070005'
+            'path-not-found' = '(?i)filenotfounderror|file not found|(?:file|path) specified|no python at'
+            'invalid-parameter' = '(?i)parameter is incorrect|invalid parameter'
+            'unsupported-operation' = '(?i)not supported|not implemented'
+            'timeout' = '(?i)timeouterror|timed out'
+            'assertion' = '(?i)assertionerror'
+        }
+        foreach ($condition in $conditions.GetEnumerator()) {
+            if ($failureText -match $condition.Value) {
+                Write-CiSummary "- Executor failure signal: $($condition.Key)."
+            }
+        }
+        $exitMatch = [regex]::Match($failureText, '(?m)^E\s+assert (-?[0-9]{1,12}) == 0\s*$')
+        if ($exitMatch.Success) {
+            Write-CiSummary "- Executor child exit code: $($exitMatch.Groups[1].Value)."
+        }
+    }
     return ($tests -gt 0 -and $passed -eq $tests)
 }
 
