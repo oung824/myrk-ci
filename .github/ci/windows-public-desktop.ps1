@@ -1,7 +1,8 @@
 #requires -Version 7.0
 param(
     [Parameter(Mandatory)]
-    [ValidateSet('electron-workflows', 'python-service', 'renderer-and-state', 'pdf-and-programming')]
+    [ValidateSet('electron-workflows', 'python-service', 'renderer-and-state', 'pdf-and-programming',
+        'diagnose-index', 'diagnose-lifecycle', 'diagnose-exit-acceptance')]
     [string]$Group
 )
 
@@ -63,6 +64,73 @@ $publicSerialCases = @(
     'the narrow production desktop reserves readable document and chat areas at 125 percent zoom'
     'the production desktop completes the programming workflow with saved real deliveries and reading controls'
 )
+$diagnosticGroups = @{
+    'diagnose-index' = @{
+        file = 'src/main/index.test.ts'
+        cases = @(
+            'a native folder selection belongs to its conversation and cannot authorize another conversation'
+            'a delivered artifact opens a fixed current snapshot only in its owning active conversation'
+        )
+        sources = @('desktop/src/main/index.ts', 'desktop/src/main/python-service.ts', 'tests/desktop_fixture.py')
+    }
+    'diagnose-lifecycle' = @{
+        file = 'src/main/lifecycle.test.ts'
+        cases = @(
+            'real hidden desktop closes, reopens and waits for owned work; blocked save=false'
+            'real hidden desktop closes, reopens and waits for owned work; blocked save=true'
+        )
+        sources = @('desktop/tests/lifecycle.electron.mjs', 'desktop/tests/reopen.electron.mjs', 'desktop/tests/desktop-process.ts',
+            'desktop/tests/process-observation.mjs', 'tests/desktop_fixture.py')
+    }
+    'diagnose-exit-acceptance' = @{
+        file = 'src/main/exit-acceptance.integration.test.ts'
+        cases = @(
+            'real desktop exits and reopens without rerunning owned work: running'
+            'real desktop exits and reopens without rerunning owned work: approval'
+            'real desktop exits and reopens without rerunning owned work: timeout'
+        )
+        sources = @('desktop/tests/exit-acceptance.electron.mjs', 'desktop/tests/desktop-process.ts',
+            'desktop/tests/process-observation.mjs', 'tests/exit_acceptance_fixture.py', 'tests/support/observed_check_runner.py')
+    }
+}
+
+function Write-DesktopDiagnostic($Diagnostic, $Module, [string]$Root) {
+    $publishedTest = "desktop/$($Diagnostic.file)"
+    $lineLimits = @{}
+    foreach ($source in (@($publishedTest) + $Diagnostic.sources)) {
+        $lineLimits[$source] = ([IO.File]::ReadLines((Join-Path $Root $source)) | Measure-Object).Count
+    }
+    foreach ($case in $Module.assertionResults) {
+        if ($case.status -eq 'passed') { continue }
+        $caseNumber = [array]::IndexOf($Diagnostic.cases, [string]$case.title) + 1
+        if ($caseNumber -eq 0) {
+            Write-CiSummary '- Desktop diagnostic signal: unknown-test-name.'
+            continue
+        }
+        $details = @($case.failureMessages) -join "`n"
+        $signal = switch -Regex ($details) {
+            '(?i)\b(?:timeout(?:error)?|timed out)(?:\s*:|\s+waiting|\s+in\s+\d)|Test timed out' { 'timeout'; break }
+            '(?i)\b(?:EPERM|EACCES|EBUSY)\b|\bWinError (?:5|32)\b|access is denied|being used by another process' { 'access-or-sharing'; break }
+            '(?i)\b(?:ENOENT|FileNotFoundError)\b|\bWinError (?:2|3)\b' { 'file-or-path-missing'; break }
+            '(?i)AssertionError|Assertion failed' { 'assertion-failure'; break }
+            default { if ($case.status -eq 'failed') { 'test-failure' } else { 'test-incomplete' } }
+        }
+        Write-CiSummary "- Desktop diagnostic case ${caseNumber}: $signal."
+        $declaration = [int]$case.location.line
+        if ($declaration -gt 0 -and $declaration -le $lineLimits[$publishedTest]) {
+            Write-CiSummary "- Test source: ${publishedTest}:$declaration."
+        }
+        $normalized = [regex]::Replace($details, '[\\/]+', '/')
+        foreach ($source in $lineLimits.Keys | Sort-Object) {
+            $relative = if ($source.StartsWith('desktop/')) { $source.Substring('desktop/'.Length) } else { $source }
+            $pathPattern = [regex]::Escape($source) + '|' + [regex]::Escape($relative)
+            $frame = [regex]::Match($normalized, '(?:^|[\s/(''\"])(?:' + $pathPattern + ')(?::|[\x22''], line )([1-9]\d{0,4})(?!\d)', 'IgnoreCase')
+            if ($frame.Success -and [int]$frame.Groups[1].Value -le $lineLimits[$source]) {
+                Write-CiSummary "- Failure source: ${source}:$($frame.Groups[1].Value)."
+            }
+        }
+    }
+}
 
 $timer = [Diagnostics.Stopwatch]::StartNew()
 $stage = 'prepare'
@@ -90,12 +158,17 @@ try {
     if (($inventory -join "`n") -cne (($assigned | Sort-Object) -join "`n")) {
         throw 'Desktop file assignments differ from the test inventory.'
     }
-    $selected = $groups[$Group]
+    $diagnostic = $diagnosticGroups[$Group]
+    $selected = if ($diagnostic) { @($diagnostic.file) } else { $groups[$Group] }
+    $selected = @($selected)
     $arguments = $selected
     $filteredSerial = $Group -eq 'pdf-and-programming'
     if ($filteredSerial) {
         $namePattern = '^(?:' + ($publicSerialCases -join '|') + ')$'
         $arguments += @('--testNamePattern', $namePattern)
+    }
+    if ($diagnostic) {
+        $arguments += @('--reporter', 'json', '--includeTaskLocation')
     }
     Write-CiSummary "- Selected Vitest files: $($selected.Count)."
 
@@ -146,6 +219,25 @@ try {
     Write-CiSummary "- Generated runtime cleanup recorded: $cleanupVerified. Runtime directory absent: $runtimeRemoved."
     Write-CiSummary "- Temporary configuration removed: $configurationRemoved. Protected generated locations unchanged: $protectedUnchanged."
 
+    $diagnosticVerified = $true
+    if ($diagnostic) {
+        $diagnosticVerified = $false
+        $diagnosticReport = Join-Path $results "$($receipts[0].BaseName)-reports" 'json/output.json'
+        if ($diagnosticReport -iin @($receipt.reports) -and (Test-Path -LiteralPath $diagnosticReport -PathType Leaf)) {
+            $report = Get-Content -LiteralPath $diagnosticReport -Raw | ConvertFrom-Json
+            $modules = @($report.testResults)
+            $expectedModule = Join-Path $desktop $diagnostic.file
+            if ($modules.Count -eq 1 -and ([string]$modules[0].name).Replace('/', '\') -ieq $expectedModule) {
+                $module = $modules[0]
+                $actualCases = ($module.assertionResults.title | Sort-Object) -join "`n"
+                $expectedCases = ($diagnostic.cases | Sort-Object) -join "`n"
+                $diagnosticVerified = $actualCases -ceq $expectedCases
+                Write-DesktopDiagnostic $diagnostic $module $root
+            }
+        }
+        Write-CiSummary "- Diagnostic case selection verified: $diagnosticVerified."
+    }
+
     $stage = 'vitest-coverage'
     $schedule = $receipt.scheduling
     $discovered = @($schedule.discovered | Where-Object { $_ })
@@ -171,7 +263,7 @@ try {
         Write-CiSummary '- Vitest case counts unavailable.'
     }
     $stage = 'result-verification'
-    if ($exitCode -ne 0 -or $receipt.result -ne 0 -or !$coverageVerified -or !$cleanupVerified -or !$runtimeRemoved -or
+    if ($exitCode -ne 0 -or $receipt.result -ne 0 -or !$coverageVerified -or !$diagnosticVerified -or !$cleanupVerified -or !$runtimeRemoved -or
         !$configurationRemoved -or !$protectedUnchanged -or $schedule.unhandled_errors -ne 0 -or $requested -lt 1 -or
         $passed -ne $requested -or $contracts.Count -ne 6 -or $contracts.tests -lt 1 -or $contracts.pass -ne $contracts.tests) {
         throw 'The managed desktop result did not pass verification.'

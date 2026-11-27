@@ -1,6 +1,7 @@
 """Run an explicit public backend test group and publish counts from managed receipts."""
 
 import argparse
+import ast
 from collections import Counter, defaultdict
 import json
 import os
@@ -9,6 +10,7 @@ import re
 import subprocess
 import sys
 from time import monotonic
+from xml.etree import ElementTree
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -103,6 +105,12 @@ DESELECT = {
         'tests/test_formal_delivery_scoring.py::test_local_delivery_does_not_replace_formal_domain_qualification',
     ),
 }
+DIAGNOSTIC_FILES = {
+    'test_action_reporting_facts': 'executor-and-network',
+    'test_recovery': 'recovery',
+    'acceptance/test_actions': 'synthetic-acceptance',
+}
+DIAGNOSTIC_XML = 'public-diagnostic.xml'
 
 
 class CheckError(Exception):
@@ -214,6 +222,40 @@ def publish_judge_diagnostic(summary, observation_path):
                         publish(summary, f'- Synthetic judge source frame: {relative}:{int(lineno)}.')
 
 
+def publish_test_diagnostic(summary, xml_path, selected_path, outcomes):
+    if not xml_path.is_file() or not xml_path.resolve().is_relative_to(RESULTS.resolve()):
+        raise CheckError('The managed launcher did not retain the diagnostic report.')
+    source = ast.parse((ROOT / selected_path).read_bytes())
+    functions = {node.name for node in source.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    labels = {node.value for node in ast.walk(source) if isinstance(node, ast.Constant) and isinstance(node.value, str)}
+    published = set(subprocess.check_output(['git', 'ls-files', '-z', '--', '*.py'], cwd=ROOT, encoding='utf-8').split('\0'))
+    tree = ElementTree.parse(xml_path)
+    error_names = {'AssertionError', 'FileNotFoundError', 'PermissionError', 'OSError', 'RuntimeError', 'ValueError',
+                   'TypeError', 'KeyError', 'AttributeError', 'TimeoutError', 'ConnectionError', 'ExceptionGroup',
+                   'Failed', 'ModuleNotFoundError', 'ImportError', 'UnicodeDecodeError', 'ValidationError'}
+    for case in tree.iter('testcase'):
+        name = case.get('name', '')
+        if case.get('file', '').replace('\\', '/') != selected_path:
+            continue
+        if outcomes.get(f'{selected_path}::{name}') != 'failed':
+            continue
+        node = re.fullmatch(r'(test_[A-Za-z0-9_]+)(?:\[([A-Za-z0-9_-]+)\])?', name)
+        if node is None or node[1] not in functions:
+            continue
+        label = name if node[2] is None or node[2] in labels else node[1]
+        publish(summary, f'- Failed case: {selected_path}::{label}.')
+        for failure in (*case.findall('failure'), *case.findall('error')):
+            frames = re.findall(r'^([^\r\n]+\.py):([0-9]+):\s*([A-Za-z][A-Za-z0-9_]*)',
+                                failure.text or '', re.MULTILINE)
+            for file, line, category in frames[-6:]:
+                path = (ROOT / file.strip()).resolve()
+                if path.is_relative_to(ROOT):
+                    relative = path.relative_to(ROOT).as_posix()
+                    if relative in published and re.fullmatch(r'[A-Za-z0-9_./-]+\.py', relative):
+                        status = category if category in error_names else 'test-failure'
+                        publish(summary, f'- Failure frame: {relative}:{int(line)} ({status}).')
+
+
 def node_outcomes(expected, observation):
     reports_by_node = defaultdict(list)
     for report in observation['reports']:
@@ -239,10 +281,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('group', choices=GROUPS)
     parser.add_argument('--native-only', action='store_true')
+    parser.add_argument('--diagnostic-file', choices=DIAGNOSTIC_FILES)
     arguments = parser.parse_args()
     group = arguments.group
     if arguments.native_only and group != 'judge-fixtures':
         parser.error('--native-only requires the judge-fixtures group')
+    if arguments.diagnostic_file and (group != DIAGNOSTIC_FILES[arguments.diagnostic_file] or arguments.native_only):
+        parser.error('--diagnostic-file must match its registered group')
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     environment = dict(os.environ, PYTHONIOENCODING='utf-8', MYRK_TASK_ID=f'github-public-backend-{group}')
     for name in ('GITHUB_STEP_SUMMARY', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE',
@@ -251,6 +296,8 @@ def main():
     publish(summary, f'### Public offline backend · {group}')
     publish(summary, 'Selected backend test files on a Windows hosted runner.')
     names = ('acceptance/test_judge_native_roundtrip',) if arguments.native_only else GROUPS[group]
+    if arguments.diagnostic_file:
+        names = (arguments.diagnostic_file,)
     paths = tuple(f'tests/{name}.py' for name in names)
     exclusions = DESELECT.get(group, ())
     deselection = tuple(f'--deselect={node}' for node in exclusions)
@@ -274,12 +321,13 @@ def main():
         publish(summary, f'- Collected {len(expected)} tests across {len(counts)}/{len(paths)} selected files.')
         if set(counts) != set(paths) or len(expected) != len(set(expected)):
             raise CheckError('The collected files or test identities differ from the selection.')
-        if group in SYNTHETIC_COUNTS and (len(expected) != SYNTHETIC_COUNTS[group]
+        if not arguments.diagnostic_file and group in SYNTHETIC_COUNTS and (len(expected) != SYNTHETIC_COUNTS[group]
                 or any(node.startswith(exclusions) for node in expected)):
             raise CheckError('The synthetic case selection differs from the reviewed scope.')
         stage = 'execution'
+        diagnostic_options = ('--tb=short', '-o', 'junit_family=xunit1', f'--junitxml={DIAGNOSTIC_XML}') if arguments.diagnostic_file else ()
         status, receipt, cleaned = run_pytest(summary, environment, stage, paths, '--myrk-shard=other',
-                                              f'--myrk-shard-manifest={manifest_path}', *deselection)
+                                              f'--myrk-shard-manifest={manifest_path}', *deselection, *diagnostic_options)
         observation_path = report_file(receipt, 'observation.json')
         observation = read_json(observation_path)
         if status and arguments.native_only:
@@ -288,6 +336,8 @@ def main():
         totals = Counter(outcomes.values())
         publish(summary, f'- Outcomes: {totals["passed"]} passed, {totals["failed"]} failed, '
                          f'{totals["skipped"]} skipped, {totals["incomplete"]} incomplete, {unexpected} unexpected.')
+        if status and arguments.diagnostic_file:
+            publish_test_diagnostic(summary, observation_path.parent.parent / DIAGNOSTIC_XML, paths[0], outcomes)
         for path in paths:
             counts = Counter(outcome for node, outcome in outcomes.items() if node.partition('::')[0] == path)
             publish(summary, f'- `{path}`: {sum(counts.values())} collected, {counts["passed"]} passed, '
@@ -301,7 +351,7 @@ def main():
     except CheckError as error:
         publish(summary, f'- Failed at {stage}. {error}')
         return 1
-    except (KeyError, OSError, TypeError, ValueError) as error:
+    except (ElementTree.ParseError, KeyError, OSError, TypeError, ValueError) as error:
         publish(summary, f'- Failed at {stage}. Receipt or environment error: {type(error).__name__}.')
         return 1
     finally:
