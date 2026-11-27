@@ -115,6 +115,15 @@ try {
     }
     if ($contracts.Count -eq 6) {
         Write-CiSummary "- Node contracts: $($contracts.tests) collected, $($contracts.pass) passed, $($contracts.fail) failed, $($contracts.cancelled) cancelled, $($contracts.skipped) skipped, $($contracts.todo) todo."
+        if ($contracts.fail -gt 0) {
+            $sources = @(Get-ChildItem -LiteralPath 'tests' -File -Filter '*.test.mjs' |
+                ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }) -join "`n"
+            foreach ($line in (Get-Content -LiteralPath $stdout)) {
+                if ($line -match '^✖ ([A-Za-z0-9 .,''/-]{10,155}) \([0-9.]+ms\)$' -and $sources.Contains($Matches[1])) {
+                    Write-CiSummary "- Failed Node contract: $($Matches[1])."
+                }
+            }
+        }
     } else {
         Write-CiSummary '- Node contract counts unavailable.'
     }
