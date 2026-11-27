@@ -2,6 +2,12 @@ name: Windows public offline backend expansion
 
 on:
   workflow_dispatch:
+    inputs:
+      focus:
+        description: Scope of the backend expansion
+        type: choice
+        options: [all, artifact-delivery]
+        default: all
 
 permissions:
   contents: read
@@ -9,28 +15,19 @@ permissions:
 jobs:
   backend:
     name: Backend ${{ matrix.group }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ contains(fromJSON('["process-and-scheduling","root-git-hooks"]'), matrix.group) && 'windows-2025' || 'windows-11-arm' }}
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - {group: process-and-scheduling, runner: windows-2025, installer: backend-public}
-          - {group: root-git-hooks, runner: windows-2025, installer: backend-public}
-          - {group: executor-and-network, runner: windows-11-arm, installer: backend-executor}
-          - {group: serial-checks, runner: windows-11-arm, installer: backend-executor}
-          - {group: action-approval, runner: windows-11-arm, installer: backend-executor}
-          - {group: artifact-delivery, runner: windows-11-arm, installer: backend-executor}
-          - {group: conversation-and-delegation, runner: windows-11-arm, installer: backend-executor}
-          - {group: desktop-conversation, runner: windows-11-arm, installer: backend-executor}
-          - {group: recovery, runner: windows-11-arm, installer: backend-executor}
-          - {group: retained-context, runner: windows-11-arm, installer: backend-executor}
-          - {group: provider-transcripts, runner: windows-11-arm, installer: backend-executor}
-          - {group: request-protocols, runner: windows-11-arm, installer: backend-executor}
-          - {group: review-evidence, runner: windows-11-arm, installer: backend-executor}
+        group: >-
+          ${{ fromJSON(inputs.focus == 'artifact-delivery' && '["artifact-delivery"]' ||
+          '["process-and-scheduling","root-git-hooks","executor-and-network","serial-checks","action-approval",
+          "artifact-delivery","conversation-and-delegation","desktop-conversation","recovery",
+          "retained-context","provider-transcripts","request-protocols","review-evidence"]') }}
     env:
       MYRK_CI_GROUP: ${{ matrix.group }}
-      MYRK_CI_INSTALLER: ${{ matrix.installer }}
+      MYRK_CI_INSTALLER: ${{ contains(fromJSON('["process-and-scheduling","root-git-hooks"]'), matrix.group) && 'backend-public' || 'backend-executor' }}
     defaults:
       run:
         shell: pwsh

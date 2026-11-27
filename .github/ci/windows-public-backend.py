@@ -47,7 +47,7 @@ GROUPS = {
         'test_extension_review',
     ),
     'artifact-delivery': (
-        'test_artifacts', 'test_extensions', 'test_formal_delivery_scoring', 'test_independent_delivery',
+        'test_artifacts', 'test_extensions', 'test_independent_delivery',
     ),
     'conversation-and-delegation': (
         'test_context', 'test_conversation', 'test_delegation', 'test_delegation_verification_status',

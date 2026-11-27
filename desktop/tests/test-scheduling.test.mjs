@@ -166,6 +166,11 @@ test('npm test does not learn a collection with test cases excluded inside a fil
     assert.equal(complete.status, 0, complete.output)
     const index = complete.receipt.scheduling.index.path
     const baseline = await readFile(index, 'utf8')
+    const fixtureConfig = join(source, 'desktop/vitest.config.ts')
+    const config = await readFile(fixtureConfig, 'utf8')
+    const focusedConfig = config.replace('  test: {', '  test: {\n    allowOnly: true,')
+    assert.notEqual(focusedConfig, config)
+    await writeFile(fixtureConfig, focusedConfig)
     await writeFile(join(source, 'desktop/src/main/ordinary.test.ts'), "import { test, expect } from 'vitest'; test.only('focused', () => expect(1).toBe(1)); test('excluded', () => expect(2).toBe(2))\n")
     const focused = await run(source, 'duration', [])
     assert.equal(focused.status, 0, focused.output)
