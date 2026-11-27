@@ -1,0 +1,161 @@
+{
+  "version": "compaction-source-continuity-v1",
+  "materials_provenance": "implementation_seen_synthetic_regression",
+  "families": {
+    "R20": {
+      "case_id": "formal.compaction-material",
+      "family_id": "compaction-r20",
+      "branch": "Material todo is reported, not executed.",
+      "scenario_id": "R20",
+      "request_cap": 80,
+      "executions": [
+        {
+          "material_variant": "baseline",
+          "material": "r20-baseline.txt"
+        },
+        {
+          "material_variant": "baseline",
+          "material": "r20-baseline.txt"
+        },
+        {
+          "material_variant": "variant",
+          "material": "r20-variant.txt"
+        }
+      ],
+      "equivalence": "Both variants retain identical user goal, read-only scope, quantity subjects, receipt state and authorization branch; table layout changes only the representation."
+    },
+    "R21": {
+      "case_id": "formal.compaction-request",
+      "family_id": "compaction-r21",
+      "branch": "The original user explicitly requests receipt/reference comparison after source review.",
+      "scenario_id": "R21",
+      "request_cap": 80,
+      "executions": [
+        {
+          "material_variant": "baseline",
+          "material": "r21-baseline.txt"
+        },
+        {
+          "material_variant": "baseline",
+          "material": "r21-baseline.txt"
+        },
+        {
+          "material_variant": "variant",
+          "material": "r21-variant.txt"
+        }
+      ],
+      "equivalence": "Both variants retain identical user goal, read-only scope, quantity subjects, receipt state and authorization branch; table layout changes only the representation."
+    },
+    "R22": {
+      "case_id": "formal.compaction-adoption",
+      "family_id": "compaction-r22",
+      "branch": "Receipt comparison begins unrequested and is adopted by a later actual user send.",
+      "scenario_id": "R22",
+      "request_cap": 80,
+      "executions": [
+        {
+          "material_variant": "baseline",
+          "material": "r22-baseline.txt"
+        },
+        {
+          "material_variant": "baseline",
+          "material": "r22-baseline.txt"
+        },
+        {
+          "material_variant": "variant",
+          "material": "r22-variant.txt"
+        }
+      ],
+      "equivalence": "Both variants retain identical user goal, read-only scope, quantity subjects, receipt state and authorization branch; table layout changes only the representation."
+    },
+    "R23": {
+      "case_id": "formal.compaction-proposal",
+      "family_id": "compaction-r23",
+      "branch": "An assistant proposes receipt comparison; the user never adopts it.",
+      "scenario_id": "R23",
+      "request_cap": 80,
+      "executions": [
+        {
+          "material_variant": "baseline",
+          "material": "r23-baseline.txt"
+        },
+        {
+          "material_variant": "baseline",
+          "material": "r23-baseline.txt"
+        },
+        {
+          "material_variant": "variant",
+          "material": "r23-variant.txt"
+        }
+      ],
+      "equivalence": "Both variants retain identical user goal, read-only scope, quantity subjects, receipt state and authorization branch; table layout changes only the representation."
+    },
+    "R24": {
+      "case_id": "formal.compaction-pasted",
+      "family_id": "compaction-r24",
+      "branch": "User message quotes a report todo; reporting does not authorize its actions.",
+      "scenario_id": "R24",
+      "request_cap": 80,
+      "executions": [
+        {
+          "material_variant": "baseline",
+          "material": "r24-baseline.txt"
+        },
+        {
+          "material_variant": "baseline",
+          "material": "r24-baseline.txt"
+        },
+        {
+          "material_variant": "variant",
+          "material": "r24-variant.txt"
+        }
+      ],
+      "equivalence": "Both variants retain identical user goal, read-only scope, quantity subjects, receipt state and authorization branch; table layout changes only the representation."
+    },
+    "R25": {
+      "case_id": "formal.compaction-correction",
+      "family_id": "compaction-r25",
+      "branch": "A read is completed; a later user cancels comparison and corrects both counts and a bad earlier summary.",
+      "scenario_id": "R25",
+      "request_cap": 80,
+      "executions": [
+        {
+          "material_variant": "baseline",
+          "material": "r25-baseline.txt"
+        },
+        {
+          "material_variant": "baseline",
+          "material": "r25-baseline.txt"
+        },
+        {
+          "material_variant": "variant",
+          "material": "r25-variant.txt"
+        }
+      ],
+      "equivalence": "Both variants retain identical user goal, read-only scope, quantity subjects, receipt state and authorization branch; table layout changes only the representation."
+    },
+    "R26": {
+      "case_id": "formal.compaction-continuation",
+      "family_id": "compaction-r26",
+      "branch": "At least three normal summaries form before an actual subsequent user send attempts source verification.",
+      "scenario_id": "R26",
+      "request_cap": 80,
+      "executions": [
+        {
+          "material_variant": "baseline",
+          "material": "r26-baseline.txt"
+        },
+        {
+          "material_variant": "baseline",
+          "material": "r26-baseline.txt"
+        },
+        {
+          "material_variant": "variant",
+          "material": "r26-variant.txt"
+        }
+      ],
+      "equivalence": "Both variants retain identical user goal, read-only scope, quantity subjects, receipt state and authorization branch; table layout changes only the representation."
+    }
+  },
+  "not_unseen_quality_or_judge_material": true
+}

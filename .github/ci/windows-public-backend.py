@@ -50,6 +50,7 @@ GROUPS = {
         'acceptance/test_action_review', 'acceptance/test_merger_t02_cancel_boundary',
         'acceptance/test_public_cancellation_protocols', 'acceptance/test_task_continuation_snapshot_contract',
     ),
+    'synthetic-local-scoring': ('test_formal_delivery_scoring',),
     'process-and-scheduling': ('test_parallel_checks', 'test_process_observation'),
     'root-git-hooks': ('test_closeout_file_lists', 'test_pre_commit', 'test_pre_commit_size'),
     'executor-and-network': (
@@ -86,6 +87,7 @@ SYNTHETIC_COUNTS = {
     'synthetic-judge-qualification': 18,
     'synthetic-trust-and-memory': 42,
     'synthetic-review-and-cancellation': 22,
+    'synthetic-local-scoring': 73,
 }
 DESELECT = {
     'synthetic-judge-qualification': (
@@ -96,6 +98,9 @@ DESELECT = {
     ),
     'synthetic-review-and-cancellation': (
         'tests/acceptance/test_action_review.py::test_independent_review_preserves_actual_decision_and_failures[stop]',
+    ),
+    'synthetic-local-scoring': (
+        'tests/test_formal_delivery_scoring.py::test_local_delivery_does_not_replace_formal_domain_qualification',
     ),
 }
 

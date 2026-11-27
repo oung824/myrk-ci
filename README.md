@@ -10,7 +10,7 @@
 
 **Windows public offline judge** 验证 130 项本地合成账本和两次固定回复的 SDK 调用。试跑用空历史索引生成本轮报告，历史原件专项在本机运行。
 
-**Windows public synthetic acceptance** 将已审核的 200 项合成验收用例分为五组。每组核对发现和实际执行的用例，使用公开仓库的空历史索引。
+**Windows public synthetic acceptance** 将已审核的 273 项合成验收用例分为六组。每组核对发现和实际执行的用例，使用公开仓库的空历史索引。
 
 **Windows public offline desktop** 在四台 Windows 11 ARM 托管机上构建 Electron 并运行桌面行为测试。三个作业执行普通和串行测试文件，一个作业执行四项单独选出的 PDF 与编程用例。Office 文档预览专项由本机负责。
 
