@@ -117,6 +117,43 @@ function Invoke-OfficeProbe {
     }
 }
 
+function Complete-ArmExecutorCleanup($Receipt) {
+    $commands = @($Receipt.commands)
+    if ($env:RUNNER_ARCH -ne 'ARM64' -or $Receipt.exit_code -ne 1 -or
+        $Receipt.cleanup_error -notmatch '\[WinError 5\]' -or $commands.Count -ne 1 -or
+        $commands[0].exit_code -ne 0 -or $commands[0].interpreter_exit_confirmed -ne $true -or
+        $commands[0].job_active_processes -ne 0 -or $Receipt.project_root -ine $root) {
+        return $false
+    }
+    $target = [IO.Path]::GetFullPath([string]$Receipt.runtime_directory)
+    $parent = Join-Path $root '.scratch/check-runs/runtime-tmp'
+    $name = Split-Path -Leaf $target
+    if ((Split-Path -Parent $target) -ine $parent -or $name -notmatch '^b-[A-Za-z0-9_-]+$' -or
+        $Receipt.owner -cne "backend-check:$name") {
+        return $false
+    }
+    foreach ($directory in @($root, (Join-Path $root '.scratch'), (Split-Path -Parent $parent), $parent)) {
+        if ((Get-Item -LiteralPath $directory).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            return $false
+        }
+    }
+    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+        if (!(Test-Path -LiteralPath $target)) { return $true }
+        if ((Resolve-Path -LiteralPath $target).ProviderPath -ine $target -or
+            ((Get-Item -LiteralPath $target).Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            @(Get-ChildItem -LiteralPath $target -Force -Recurse -Attributes ReparsePoint).Count -ne 0) {
+            return $false
+        }
+        try {
+            Remove-Item -LiteralPath $target -Recurse -Force -ErrorAction Stop
+        } catch [System.IO.IOException], [System.UnauthorizedAccessException] {
+            Start-Sleep -Milliseconds 500
+        }
+        if (!(Test-Path -LiteralPath $target)) { return $true }
+    }
+    return $false
+}
+
 $timer = [Diagnostics.Stopwatch]::StartNew()
 $stage = 'prepare'
 $nativeExitCode = $null
@@ -251,6 +288,11 @@ try {
                 if ($Check -ne 'python-types') {
                     $allPassed = Write-PytestResult $receipt
                     if ($exitCode -eq 0 -and -not $allPassed) { $exitCode = 1 }
+                    if ($Check -eq 'backend-executor' -and $allPassed -and
+                        $receipt.runtime_removed -eq $false -and (Complete-ArmExecutorCleanup $receipt)) {
+                        Write-CiSummary '- ARM executor runtime removed by scoped retry after verified process exit.'
+                        $exitCode = 0
+                    }
                 }
             }
         }

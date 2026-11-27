@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 from time import monotonic
@@ -72,6 +73,21 @@ def run_pytest(summary, environment, phase, paths, *options):
     if len(commands) != 1 or receipt['exit_code'] != result.returncode:
         raise CheckError('The launcher receipt does not match this invocation.')
     cleanup_complete = runtime_removed == interpreter_exited == jobs_empty == 1
+    if result.returncode and environment.get('MYRK_TASK_ID') == 'github-public-backend-judge-fixtures':
+        failure_text = commands[0].get('output_tail', '')
+        for name in receipt.get('failure_logs', []):
+            path = Path(name).resolve()
+            if path.is_relative_to(RESULTS.resolve()) and path.is_file():
+                with path.open('rb') as output:
+                    output.seek(max(path.stat().st_size - 6000, 0))
+                    failure_text += output.read().decode('utf-8', errors='replace')
+        exception = re.findall(r'\b(?:FileNotFoundError|ImportError|ModuleNotFoundError|PermissionError|'
+                               r'ValueError|TypeError|AttributeError|RuntimeError|AssertionError)\b', failure_text)
+        frames = re.findall(r'\b(?:tests|myrk)[\\/][A-Za-z0-9_.\\/-]+\.py:\d+\b', failure_text)
+        if exception:
+            publish(summary, '- Judge exception classes: ' + ', '.join(dict.fromkeys(exception)) + '.')
+        if frames:
+            publish(summary, '- Judge failure frames: ' + ', '.join(list(dict.fromkeys(frames))[-6:]) + '.')
     return result.returncode, receipt, cleanup_complete
 
 
