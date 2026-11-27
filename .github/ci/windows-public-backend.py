@@ -35,6 +35,11 @@ GROUPS = {
     ),
     'layout-context': ('test_layout_context',),
     'judge-fixtures': ('acceptance/test_judge_full_ledger', 'acceptance/test_judge_native_roundtrip'),
+    'synthetic-acceptance': (
+        'acceptance/test_actions', 'acceptance/test_compaction_replay', 'acceptance/test_recorded_response',
+        'acceptance/test_reporting_response_decoding', 'acceptance/test_review_failure_matching',
+        'acceptance/test_save_diagnostics',
+    ),
     'process-and-scheduling': ('test_parallel_checks', 'test_process_observation'),
     'root-git-hooks': ('test_closeout_file_lists', 'test_pre_commit', 'test_pre_commit_size'),
     'executor-and-network': (
