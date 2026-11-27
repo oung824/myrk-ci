@@ -2,7 +2,7 @@
 
 本仓库保存一份 Myrk 源码快照，用于在不同的 Windows 托管机上验证安装和离线测试入口。
 
-在 GitHub Actions 手动运行 **Windows offline pilot**。试跑包含 Python 类型检查、TypeScript 类型检查、两组后端测试、桌面测试入口契约和 Office 安装探测。后端测试使用固定样例和本地替身。准备依赖时需要联网下载公开的软件包。
+在 GitHub Actions 手动运行 **Windows offline pilot**。试跑包含 Python 类型检查、TypeScript 类型检查、两组后端测试、桌面测试入口契约和 Office 安装探测。固定执行器测试使用 Windows 11 ARM。后端测试使用固定样例和本地替身。准备依赖时需要联网下载公开的软件包。
 
 **Windows public offline backend** 将 27 份已选后端测试文件分到六台托管机，并比对发现和实际执行的用例身份。需要真实文件访问限制的布局测试使用 Windows 11 ARM。**Windows 11 ARM executor probe** 用同一固定执行器探测该环境的系统访问限制能力。
 

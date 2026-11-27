@@ -9,7 +9,7 @@ permissions:
 jobs:
   pilot:
     name: ${{ matrix.name }}
-    runs-on: windows-2025
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -18,21 +18,27 @@ jobs:
           - check: python-types
             name: Backend type check
             runtime: python
+            runner: windows-2025
           - check: backend-records
             name: Backend smoke - conversation records and context
             runtime: python
+            runner: windows-2025
           - check: backend-executor
             name: Backend smoke - executor output
             runtime: python
+            runner: windows-11-arm
           - check: typescript-types
             name: Desktop type check
             runtime: node
+            runner: windows-2025
           - check: desktop-contracts
             name: Desktop smoke - runner contracts
             runtime: node
+            runner: windows-2025
           - check: office-com
             name: Office COM availability
             runtime: office
+            runner: windows-2025
     env:
       MYRK_PILOT_CHECK: ${{ matrix.check }}
     defaults:
