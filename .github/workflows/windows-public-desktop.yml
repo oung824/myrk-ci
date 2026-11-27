@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope for a focused runner diagnostic
         type: choice
-        options: [all, renderer-and-state]
+        options: [all, renderer-and-state, process-workflows]
         default: all
 
 permissions:
@@ -20,7 +20,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: ${{ fromJSON(inputs.focus == 'renderer-and-state' && '["renderer-and-state"]' || '["electron-workflows","python-service","renderer-and-state","pdf-and-programming"]') }}
+        group: >-
+          ${{ fromJSON(inputs.focus == 'renderer-and-state' && '["renderer-and-state"]' ||
+          inputs.focus == 'process-workflows' && '["electron-workflows","python-service"]' ||
+          '["electron-workflows","python-service","renderer-and-state","pdf-and-programming"]') }}
     env:
       MYRK_CI_DESKTOP_GROUP: ${{ matrix.group }}
     defaults:

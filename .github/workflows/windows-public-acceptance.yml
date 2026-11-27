@@ -2,14 +2,28 @@ name: Windows public synthetic acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      focus:
+        description: Run all groups or only the four additional groups
+        type: choice
+        options: [all, additional]
+        default: all
 
 permissions:
   contents: read
 
 jobs:
   acceptance:
+    name: Acceptance ${{ matrix.group }}
     runs-on: windows-11-arm
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        group: >-
+          ${{ fromJSON(inputs.focus == 'additional' &&
+          '["synthetic-quality","synthetic-judge-qualification","synthetic-trust-and-memory","synthetic-review-and-cancellation"]' ||
+          '["synthetic-acceptance","synthetic-quality","synthetic-judge-qualification","synthetic-trust-and-memory","synthetic-review-and-cancellation"]') }}
     defaults:
       run:
         shell: pwsh
@@ -29,6 +43,8 @@ jobs:
           New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
           Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
       - name: Run the public synthetic tests
+        env:
+          MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
         run: |
-          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' synthetic-acceptance
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_ACCEPTANCE_GROUP
           exit $LASTEXITCODE

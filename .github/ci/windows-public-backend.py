@@ -40,6 +40,16 @@ GROUPS = {
         'acceptance/test_reporting_response_decoding', 'acceptance/test_review_failure_matching',
         'acceptance/test_save_diagnostics',
     ),
+    'synthetic-quality': (
+        'acceptance/test_quality_governance_parcel_score', 'acceptance/test_quality_recovery_supplement',
+        'acceptance/test_quality_diagnostic_review',
+    ),
+    'synthetic-judge-qualification': ('acceptance/test_judge_qualification',),
+    'synthetic-trust-and-memory': ('acceptance/test_trust', 'acceptance/test_memory'),
+    'synthetic-review-and-cancellation': (
+        'acceptance/test_action_review', 'acceptance/test_merger_t02_cancel_boundary',
+        'acceptance/test_public_cancellation_protocols', 'acceptance/test_task_continuation_snapshot_contract',
+    ),
     'process-and-scheduling': ('test_parallel_checks', 'test_process_observation'),
     'root-git-hooks': ('test_closeout_file_lists', 'test_pre_commit', 'test_pre_commit_size'),
     'executor-and-network': (
@@ -70,6 +80,24 @@ GROUPS = {
 }
 PHASES = {'setup', 'call', 'teardown'}
 RESULTS = ROOT / '.scratch/check-runs/results'
+SYNTHETIC_COUNTS = {
+    'synthetic-acceptance': 82,
+    'synthetic-quality': 36,
+    'synthetic-judge-qualification': 18,
+    'synthetic-trust-and-memory': 42,
+    'synthetic-review-and-cancellation': 22,
+}
+DESELECT = {
+    'synthetic-judge-qualification': (
+        'tests/acceptance/test_judge_qualification.py::test_native_judge_controls_keep_complete_input_and_zero_send_boundaries',
+    ),
+    'synthetic-trust-and-memory': (
+        'tests/acceptance/test_memory.py::test_unsaved_notes_remain_absent_and_failed_batches_do_not_partially_apply[save-failure]',
+    ),
+    'synthetic-review-and-cancellation': (
+        'tests/acceptance/test_action_review.py::test_independent_review_preserves_actual_decision_and_failures[stop]',
+    ),
+}
 
 
 class CheckError(Exception):
@@ -166,6 +194,19 @@ def publish_judge_diagnostic(summary, observation_path):
                 category = 'none'
             publish(summary, f'- Synthetic judge outcome: {status}, {category}, '
                              f'{numbers[0]} HTTP, {numbers[1]} reserved, {numbers[2]} completed.')
+            failure = item.get('evidence', {}).get('failure')
+            if not isinstance(failure, str):
+                continue
+            trace = (result_path.parent / failure).resolve()
+            if not trace.is_relative_to(result_path.parent) or trace.name != 'failure.txt' or not trace.is_file():
+                continue
+            frames = re.findall(r'^  File "([^"]+)", line ([0-9]+),', trace.read_text(encoding='utf-8'), re.MULTILINE)
+            for filename, lineno in frames[-7:]:
+                source = Path(filename).resolve()
+                if source.is_relative_to(ROOT / 'myrk') or source.is_relative_to(ROOT / 'tests'):
+                    relative = source.relative_to(ROOT).as_posix()
+                    if re.fullmatch(r'[A-Za-z0-9_./-]+\.py', relative) and source.is_file():
+                        publish(summary, f'- Synthetic judge source frame: {relative}:{int(lineno)}.')
 
 
 def node_outcomes(expected, observation):
@@ -206,6 +247,8 @@ def main():
     publish(summary, 'Selected backend test files on a Windows hosted runner.')
     names = ('acceptance/test_judge_native_roundtrip',) if arguments.native_only else GROUPS[group]
     paths = tuple(f'tests/{name}.py' for name in names)
+    exclusions = DESELECT.get(group, ())
+    deselection = tuple(f'--deselect={node}' for node in exclusions)
     for path in paths:
         publish(summary, f'- `{path}`')
     started = monotonic()
@@ -215,7 +258,8 @@ def main():
         if len(inventory) != len(set(inventory)) or any(not (ROOT / path).is_file() for path in paths):
             raise CheckError('A test file is duplicated across groups or missing from this group.')
         stage = 'collection'
-        status, receipt, cleaned = run_pytest(summary, environment, stage, paths, '--collect-only', '--myrk-shard=collect')
+        status, receipt, cleaned = run_pytest(summary, environment, stage, paths, '--collect-only', '--myrk-shard=collect',
+                                              *deselection)
         if status or not cleaned:
             raise CheckError('Collection or its process cleanup failed.')
         manifest_path = report_file(receipt, 'collection.json')
@@ -225,9 +269,12 @@ def main():
         publish(summary, f'- Collected {len(expected)} tests across {len(counts)}/{len(paths)} selected files.')
         if set(counts) != set(paths) or len(expected) != len(set(expected)):
             raise CheckError('The collected files or test identities differ from the selection.')
+        if group in SYNTHETIC_COUNTS and (len(expected) != SYNTHETIC_COUNTS[group]
+                or any(node.startswith(exclusions) for node in expected)):
+            raise CheckError('The synthetic case selection differs from the reviewed scope.')
         stage = 'execution'
         status, receipt, cleaned = run_pytest(summary, environment, stage, paths, '--myrk-shard=other',
-                                              f'--myrk-shard-manifest={manifest_path}')
+                                              f'--myrk-shard-manifest={manifest_path}', *deselection)
         observation_path = report_file(receipt, 'observation.json')
         observation = read_json(observation_path)
         if status and arguments.native_only:

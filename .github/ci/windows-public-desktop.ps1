@@ -160,6 +160,13 @@ try {
         $requested = $total
         if ($filteredSerial) { $requested = $publicSerialCases.Count }
         Write-CiSummary "- Vitest cases: $total collected, $requested requested, $passed passed. Unhandled errors: $([int]$schedule.unhandled_errors)."
+        if ($passed -ne $requested -and !$filteredSerial) {
+            foreach ($file in $executed) {
+                if ($file.path -cin $selected -and [int]$file.test_cases.passed -lt [int]$file.test_cases.collected) {
+                    Write-CiSummary "- Vitest incomplete file: $($file.path), $([int]$file.test_cases.passed)/$([int]$file.test_cases.collected) passed."
+                }
+            }
+        }
     } else {
         Write-CiSummary '- Vitest case counts unavailable.'
     }
