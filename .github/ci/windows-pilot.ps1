@@ -4,9 +4,13 @@ param(
     [ValidateSet('install', 'check')]
     [string]$Phase,
     [Parameter(Mandatory)]
-    [ValidateSet('python-types', 'backend-records', 'backend-executor', 'typescript-types', 'desktop-contracts', 'office-com')]
+    [ValidateSet('python-types', 'backend-records', 'backend-executor', 'backend-public', 'typescript-types', 'desktop-contracts', 'office-com')]
     [string]$Check
 )
+
+if ($Check -eq 'backend-public' -and $Phase -ne 'install') {
+    throw 'Use windows-public-backend.py to run a public backend test group.'
+}
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -134,7 +138,11 @@ try {
 
     if ($Phase -eq 'install' -or $Check -eq 'office-com') {
         Write-CiSummary "### $Check"
-        Write-CiSummary 'Windows pilot scoped to selected offline checks.'
+        if ($Check -eq 'backend-public') {
+            Write-CiSummary 'Locked Python dependencies for selected public backend checks.'
+        } else {
+            Write-CiSummary 'Windows pilot scoped to selected offline checks.'
+        }
         if ($env:RUNNER_ARCH -in @('X64', 'ARM64')) {
             Write-CiSummary "- Runner architecture: $($env:RUNNER_ARCH)."
         }
