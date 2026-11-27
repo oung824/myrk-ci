@@ -225,6 +225,29 @@ try {
                 if ($receipt.runtime_removed -is [bool]) {
                     Write-CiSummary "- Backend runtime removed: $($receipt.runtime_removed)."
                 }
+                if ($Check -eq 'backend-executor' -and $receipt.runtime_removed -eq $false) {
+                    $command = @($receipt.commands)[0]
+                    Write-CiSummary "- Executor interpreter exit confirmed: $($command.interpreter_exit_confirmed -eq $true)."
+                    if ($null -ne $command.job_active_processes) {
+                        Write-CiSummary "- Executor Windows job process count: $([int]$command.job_active_processes)."
+                    }
+                    $cleanup = [string]$receipt.cleanup_error
+                    $codeMatch = [regex]::Match($cleanup, '\[(WinError|Errno) (\d+)\]')
+                    if ($codeMatch.Success) {
+                        Write-CiSummary "- Executor cleanup system error: $($codeMatch.Groups[1].Value) $($codeMatch.Groups[2].Value)."
+                    }
+                    $cleanupSignals = [ordered]@{
+                        'access-denied' = '(?i)access (?:is )?denied|permissionerror|0x80070005'
+                        'sharing-violation' = '(?i)being used by another process|sharing violation'
+                        'directory-not-empty' = '(?i)directory is not empty'
+                        'path-changed' = '(?i)path changed|linked output paths'
+                    }
+                    foreach ($signal in $cleanupSignals.GetEnumerator()) {
+                        if ($cleanup -match $signal.Value) {
+                            Write-CiSummary "- Executor cleanup signal: $($signal.Key)."
+                        }
+                    }
+                }
                 if ($Check -ne 'python-types') {
                     $allPassed = Write-PytestResult $receipt
                     if ($exitCode -eq 0 -and -not $allPassed) { $exitCode = 1 }
