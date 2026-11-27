@@ -53,6 +53,7 @@ GROUPS = {
         'acceptance/test_public_cancellation_protocols', 'acceptance/test_task_continuation_snapshot_contract',
     ),
     'synthetic-local-scoring': ('test_formal_delivery_scoring',),
+    'synthetic-question-review': ('acceptance/test_question_review',),
     'process-and-scheduling': ('test_parallel_checks', 'test_process_observation'),
     'root-git-hooks': ('test_closeout_file_lists', 'test_pre_commit', 'test_pre_commit_size'),
     'executor-and-network': (
@@ -90,6 +91,7 @@ SYNTHETIC_COUNTS = {
     'synthetic-trust-and-memory': 42,
     'synthetic-review-and-cancellation': 22,
     'synthetic-local-scoring': 73,
+    'synthetic-question-review': 76,
 }
 DESELECT = {
     'synthetic-judge-qualification': (
@@ -103,6 +105,10 @@ DESELECT = {
     ),
     'synthetic-local-scoring': (
         'tests/test_formal_delivery_scoring.py::test_local_delivery_does_not_replace_formal_domain_qualification',
+    ),
+    'synthetic-question-review': (
+        'tests/acceptance/test_question_review.py::test_five_output_types_use_actual_sources_and_keep_domain_criteria',
+        'tests/acceptance/test_question_review.py::test_formal_attachment_uses_the_same_read_only_product_settings',
     ),
 }
 DIAGNOSTIC_FILES = {

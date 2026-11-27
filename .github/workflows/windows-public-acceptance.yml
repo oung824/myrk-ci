@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the synthetic acceptance run
         type: choice
-        options: [all, additional, initial, local-scoring]
+        options: [all, additional, initial, local-scoring, question-review]
         default: all
 
 permissions:
@@ -25,8 +25,9 @@ jobs:
           '["synthetic-quality","synthetic-judge-qualification","synthetic-trust-and-memory","synthetic-review-and-cancellation"]' ||
           inputs.focus == 'initial' && '["synthetic-acceptance"]' ||
           inputs.focus == 'local-scoring' && '["synthetic-local-scoring"]' ||
+          inputs.focus == 'question-review' && '["synthetic-question-review"]' ||
           '["synthetic-acceptance","synthetic-quality","synthetic-judge-qualification","synthetic-trust-and-memory",
-          "synthetic-review-and-cancellation","synthetic-local-scoring"]') }}
+          "synthetic-review-and-cancellation","synthetic-local-scoring","synthetic-question-review"]') }}
     defaults:
       run:
         shell: pwsh
