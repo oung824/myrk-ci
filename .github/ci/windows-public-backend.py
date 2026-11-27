@@ -54,6 +54,8 @@ GROUPS = {
     ),
     'synthetic-local-scoring': ('test_formal_delivery_scoring',),
     'synthetic-question-review': ('acceptance/test_question_review',),
+    'synthetic-delegation': ('acceptance/test_delegation',),
+    'synthetic-compaction': ('acceptance/test_compaction',),
     'process-and-scheduling': ('test_parallel_checks', 'test_process_observation'),
     'root-git-hooks': ('test_closeout_file_lists', 'test_pre_commit', 'test_pre_commit_size'),
     'executor-and-network': (
@@ -92,6 +94,8 @@ SYNTHETIC_COUNTS = {
     'synthetic-review-and-cancellation': 22,
     'synthetic-local-scoring': 73,
     'synthetic-question-review': 76,
+    'synthetic-delegation': 44,
+    'synthetic-compaction': 28,
 }
 DESELECT = {
     'synthetic-judge-qualification': (
@@ -109,6 +113,14 @@ DESELECT = {
     'synthetic-question-review': (
         'tests/acceptance/test_question_review.py::test_five_output_types_use_actual_sources_and_keep_domain_criteria',
         'tests/acceptance/test_question_review.py::test_formal_attachment_uses_the_same_read_only_product_settings',
+    ),
+    'synthetic-delegation': (
+        'tests/acceptance/test_delegation.py::test_child_delivers_real_file_parent_reads_back_and_checks_final_bytes',
+        'tests/acceptance/test_delegation.py::test_ordinary_readback_and_final_check_do_not_invent_special_verification_registration',
+        'tests/acceptance/test_delegation.py::test_correct_artifact_cannot_hide_scripted_false_acceptance_claims',
+    ),
+    'synthetic-compaction': (
+        'tests/acceptance/test_compaction.py::test_semantic_material_runs_summary_and_post_reopen_work_without_grading_leak',
     ),
 }
 DIAGNOSTIC_FILES = {

@@ -14,16 +14,16 @@ from tests.support.agent_acceptance.compaction import classify_known_failure
 from tests.support.agent_acceptance.compaction_review import CRITERIA, HumanReview, apply_reviews
 
 
-def execute(case_id, protocol="deepseek"):
+def execute(case_id, protocol="deepseek", *, include_original_materials=True):
     registry = CaseRegistry()
-    register(registry)
+    register(registry, include_original_materials=include_original_materials)
     root = Path(os.environ["MYRK_CHECK_RUN_DIRECTORY"]) / "reports" / "compaction" / uuid4().hex
     return asyncio.run(run_plan(AcceptancePlan(cases=[case_id], protocols=[protocol]), root=root, registry=registry)).cases[0]
 
 
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 def test_short_summary_survives_reopen_and_separates_sdk_input_from_coverage(protocol):
-    outcome = execute("compaction.short", protocol)
+    outcome = execute("compaction.short", protocol, include_original_materials=False)
     assert outcome.tool_status == outcome.product_status == "passed", outcome.facts
     assert outcome.semantic_status == "not_measured"
     assert outcome.facts["originals_unchanged"]
@@ -38,7 +38,7 @@ def test_short_summary_survives_reopen_and_separates_sdk_input_from_coverage(pro
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 @pytest.mark.parametrize("case_id", ["long", "truncated", "service-failure", "interrupted", "missing-usage", "window-recovery"])
 def test_summary_boundaries_preserve_originals_and_request_ownership(protocol, case_id):
-    outcome = execute(f"compaction.{case_id}", protocol)
+    outcome = execute(f"compaction.{case_id}", protocol, include_original_materials=False)
     assert outcome.tool_status == outcome.product_status == "passed", outcome.facts
     assert outcome.facts["originals_unchanged"]
     assert outcome.semantic_status == "not_measured"
@@ -77,7 +77,7 @@ def test_semantic_material_runs_summary_and_post_reopen_work_without_grading_lea
 
 
 def test_first_tool_result_below_hard_budget_continues_without_a_summary():
-    outcome = execute("compaction.early-no-history")
+    outcome = execute("compaction.early-no-history", include_original_materials=False)
     assert outcome.product_status == outcome.tool_status == "passed", outcome.facts
     assert outcome.facts["attempt_purposes"] == ["work", "work"]
     assert outcome.facts["mock_http_attempts"] == 2
@@ -92,7 +92,7 @@ def test_first_tool_result_below_hard_budget_continues_without_a_summary():
 
 
 def test_window_reopen_preserves_the_used_recovery_opportunity():
-    outcome = execute("compaction.window-reopen")
+    outcome = execute("compaction.window-reopen", include_original_materials=False)
     assert outcome.tool_status == outcome.product_status == "passed", outcome.facts
     assert outcome.facts["logical_step_identity_across_reopen"] == "preserved"
     assert outcome.facts["capacity_recovery_used"] is True
@@ -111,7 +111,7 @@ def test_window_reopen_preserves_the_used_recovery_opportunity():
 
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 def test_second_compaction_preserves_inherited_sources_and_its_actual_input(protocol):
-    outcome = execute("compaction.repeated", protocol)
+    outcome = execute("compaction.repeated", protocol, include_original_materials=False)
     assert outcome.product_status == outcome.tool_status == "passed", outcome.facts
     assert outcome.facts["inherited_coverage"]
     report = json.loads(outcome.evidence["review"].read_text(encoding="utf-8"))
@@ -125,7 +125,7 @@ def test_second_compaction_preserves_inherited_sources_and_its_actual_input(prot
 def test_unrelated_error_and_disappeared_symptom_require_review(symptom):
     from copy import deepcopy
 
-    observed = execute(f"compaction.{symptom}")
+    observed = execute(f"compaction.{symptom}", include_original_materials=False)
     for changes in ({"error": "A new, unrelated failure."}, {"turn_status": "completed", "error": None}, {"mock_http_attempts": 0}):
         changed = deepcopy(observed)
         changed.facts.update(changes)
@@ -136,7 +136,7 @@ def test_unrelated_error_and_disappeared_symptom_require_review(symptom):
 
 
 def test_named_six_point_review_is_bound_to_actual_output_but_fixture_stays_unmeasured():
-    outcome = execute("compaction.short")
+    outcome = execute("compaction.short", include_original_materials=False)
     path = outcome.evidence["review"]
     sample = json.loads(path.read_text(encoding="utf-8"))["samples"][0]
     review = HumanReview(sample_id=sample["sample_id"], sdk_sha256=sample["sdk_sha256"], wire_sha256=sample["wire_sha256"],
