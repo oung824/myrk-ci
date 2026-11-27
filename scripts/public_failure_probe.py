@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+from subprocess import CalledProcessError
 
 import pytest
 
@@ -120,7 +121,7 @@ def recovery(values):
 PROBES = {
     "tests/acceptance/test_actions.py::test_local_effect_branches_keep_real_results[read-denied]": (51, read_denied),
     "tests/test_action_reporting_facts.py::test_bounded_action_summary_keeps_preparation_read_when_deletion_is_declined": (
-        404, action_summary,
+        405, action_summary,
     ),
     "tests/test_recovery.py::test_interrupted_real_edit_is_verified_then_resumed_without_repeating[after_check]": (
         136, recovery,
@@ -133,14 +134,22 @@ PROBES = {
 def pytest_runtest_makereport(item, call):
     outcome = yield
     report = outcome.get_result()
-    if call.when != "call" or not report.failed or call.excinfo is None or not call.excinfo.errisinstance(AssertionError):
+    if call.when != "call" or not report.failed or call.excinfo is None:
         return
     probe = PROBES.get(item.nodeid)
     if probe is None:
         return
     line, extract = probe
     function = item.nodeid.partition("::")[2].partition("[")[0]
-    for entry in reversed(call.excinfo.traceback):
-        if entry.name == function and entry.lineno + 1 == line:
-            item.user_properties.extend(extract(entry.locals).items())
-            return
+    error = call.excinfo.value
+    while error is not None:
+        if isinstance(error, AssertionError):
+            frame = error.__traceback__
+            while frame is not None:
+                if frame.tb_frame.f_code.co_name == function and frame.tb_lineno == line:
+                    item.user_properties.extend(extract(frame.tb_frame.f_locals).items())
+                    if extract is recovery:
+                        item.user_properties.append(("recovery_cleanup_command_failed", isinstance(call.excinfo.value, CalledProcessError)))
+                    return
+                frame = frame.tb_next
+        error = error.__cause__ or error.__context__

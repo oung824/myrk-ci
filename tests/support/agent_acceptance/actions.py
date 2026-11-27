@@ -175,8 +175,10 @@ async def file_error(context: CaseContext) -> CaseOutcome:
         and source.read_bytes() == (b"changed-while-waiting" if conflict else b"prepared-original" if context.case_id.endswith("denied") else b"invalid-prefix\xff\xfe")
         and (len(decisions) == 1 and action.before_sha256 is not None if conflict else action.error is not None))
     if not conflict:
-        error_marker = "拒绝访问。 (os error 5)" if context.case_id.endswith("denied") else "UTF-8"
-        passed = (passed and action.error is not None and error_marker in action.error
+        error = action.error or ""
+        matches_error = (re.search(r"\b(?:os error|WinError) 5\b", error, re.IGNORECASE) is not None
+            if context.case_id.endswith("denied") else "UTF-8" in error)
+        passed = (passed and matches_error
             and ("prepared-original" if context.case_id.endswith("denied") else "invalid-prefix") not in json.dumps(session.sdk_inputs))
     return record_outcome(context, session, conversation, task, turn, passed,
         facts={"file_bytes": source.read_bytes().hex(), "decisions": decisions}, evidence={"source": source})

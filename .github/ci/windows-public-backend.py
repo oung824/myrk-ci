@@ -149,6 +149,7 @@ DIAGNOSTIC_BOOLEAN_FIELDS = {
     'recovery_service_pid_present', 'recovery_edit_applied', 'recovery_record_available',
     'recovery_check_started', 'recovery_check_result', 'recovery_check_receipt_exists',
     'recovery_check_started_file_exists',
+    'recovery_cleanup_command_failed',
 }
 
 

@@ -401,10 +401,12 @@ def test_bounded_action_summary_keeps_preparation_read_when_deletion_is_declined
     assert "按记录顺序列最后8条，省略2条" in facts
     assert "不是完整文件访问审计" in facts
     assert long_target not in facts and "metadata-suffix" not in facts
-    assert sum("目标截短" in line for line in lines) == 7
+    delete_target_is_truncated = len(deletion.target) > 120
+    assert sum("目标截短" in line for line in lines) == 7 + delete_target_is_truncated
     assert all(action.id not in facts for action in turn.actions[:2])
     assert all(facts.count(action.id) == 1 for action in turn.actions[2:])
     deletion_line = next(line for line in lines if deletion.id in line)
+    assert ("目标截短" in deletion_line) is delete_target_is_truncated
     assert "状态：已拒绝" in deletion_line
     assert "所提议动作未执行，不排除准备读取" in deletion_line
     assert "为版本核对已读取原件" in deletion_line
