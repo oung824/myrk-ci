@@ -139,18 +139,6 @@ DIAGNOSTIC_CASES = {
     'acceptance/test_actions': ('test_local_effect_branches_keep_real_results[read-denied]',),
 }
 DIAGNOSTIC_XML = 'public-diagnostic.xml'
-DIAGNOSTIC_BOOLEAN_FIELDS = {
-    'summary_delete_target_over_120',
-    'read_denied_turn_completed', 'read_denied_source_unchanged', 'read_denied_canary_in_action_output',
-    'read_denied_sdk_evidence_available', 'read_denied_canary_in_sdk',
-    'read_denied_os_error_5', 'read_denied_zh_message', 'read_denied_en_message',
-    'read_denied_executor_reply', 'read_denied_scope_self_check',
-    'recovery_marker_present', 'recovery_check_pid_present', 'recovery_script_effect_present',
-    'recovery_service_pid_present', 'recovery_edit_applied', 'recovery_record_available',
-    'recovery_check_started', 'recovery_check_result', 'recovery_check_receipt_exists',
-    'recovery_check_started_file_exists',
-    'recovery_cleanup_command_failed',
-}
 
 
 class CheckError(Exception):
@@ -284,14 +272,6 @@ def publish_test_diagnostic(summary, xml_path, selected_path, outcomes):
             continue
         label = name if node[2] is None or node[2] in labels else node[1]
         publish(summary, f'- Failed case: {selected_path}::{label}.')
-        for field in case.findall('properties/property'):
-            key, value = field.get('name'), field.get('value', '')
-            if (key in DIAGNOSTIC_BOOLEAN_FIELDS and value in {'True', 'False', 'true', 'false'}
-                    or key == 'summary_truncation_count' and re.fullmatch(r'(?:[0-9]|10)', value)
-                    or key == 'read_denied_action_status' and value in {
-                        'awaiting_approval', 'cancelled', 'completed', 'conflict', 'denied', 'failed', 'started', 'unknown',
-                    }):
-                publish(summary, f'- Failure probe {key}={value.lower()}.')
         for failure in (*case.findall('failure'), *case.findall('error')):
             frames = re.findall(r'^([^\r\n]+\.py):([0-9]+):\s*([A-Za-z][A-Za-z0-9_]*)',
                                 failure.text or '', re.MULTILINE)
@@ -382,7 +362,7 @@ def main():
             raise CheckError('The synthetic case selection differs from the reviewed scope.')
         stage = 'execution'
         diagnostic_options = (
-            '--tb=short', '-o', 'junit_family=xunit1', f'--junitxml={DIAGNOSTIC_XML}', '-p', 'scripts.public_failure_probe',
+            '--tb=short', '-o', 'junit_family=xunit1', f'--junitxml={DIAGNOSTIC_XML}',
         ) if arguments.diagnostic_file else ()
         status, receipt, cleaned = run_pytest(summary, environment, stage, selection, '--myrk-shard=other',
                                               f'--myrk-shard-manifest={manifest_path}', *deselection, *diagnostic_options)
