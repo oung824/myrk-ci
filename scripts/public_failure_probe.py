@@ -124,9 +124,9 @@ PROBES = {
         405, action_summary,
     ),
     "tests/test_recovery.py::test_interrupted_real_edit_is_verified_then_resumed_without_repeating[after_check]": (
-        136, recovery,
+        139, recovery,
     ),
-    "tests/test_recovery.py::test_running_check_is_observed_without_retry_until_its_receipt_exists": (218, recovery),
+    "tests/test_recovery.py::test_running_check_is_observed_without_retry_until_its_receipt_exists": (221, recovery),
 }
 
 

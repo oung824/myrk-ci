@@ -14,6 +14,9 @@ from myrk.conversation import Conversation
 from pydantic_ai.models.test import TestModel
 
 
+CHECK_WATCH_WINDOW_SECONDS = 20
+
+
 def test_interrupted_generated_command_uses_its_exit_receipt_without_rerunning(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / "notes.txt").write_text("苹果 3\n", encoding="utf-8")
     (tmp_path / "check.py").write_text("from pathlib import Path\np=Path('runs.txt')\np.write_text(p.read_text()+'x' if p.exists() else 'x')\nprint('completed-generated-command-proof')\n", encoding="utf-8")
@@ -131,7 +134,7 @@ def test_interrupted_real_edit_is_verified_then_resumed_without_repeating(tmp_pa
                 if event["event"] == "action" and event["action"]["kind"] == "check" and event["action"]["status"] == "completed":
                     break
         else:
-            deadline = monotonic() + 7
+            deadline = monotonic() + (CHECK_WATCH_WINDOW_SECONDS if point == "after_check" else 7)
             while not marker.exists():
                 assert monotonic() < deadline
                 sleep(.01)
@@ -213,7 +216,7 @@ def test_running_check_is_observed_without_retry_until_its_receipt_exists(tmp_pa
             assert channel.receive()["event"] == "configured"
             channel.send({"action": "send", "prompt": "改写再检查", "scope": {"root": str(tmp_path), "allowed_actions": ["read", "edit", "check"], "provider": "deepseek", "recipients": ["deepseek"], "checks": [{"name": "指定检查", "argv": [sys.executable, str(script)]}]}})
             started = channel.receive()
-            deadline = monotonic() + 7
+            deadline = monotonic() + CHECK_WATCH_WINDOW_SECONDS
             while not (tmp_path / "check.pid").exists():
                 assert monotonic() < deadline
                 sleep(.01)

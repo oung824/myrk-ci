@@ -381,9 +381,9 @@ def main():
                 or any(node.startswith(exclusions) for node in expected)):
             raise CheckError('The synthetic case selection differs from the reviewed scope.')
         stage = 'execution'
-        diagnostic_options = ('--tb=short', '-o', 'junit_family=xunit1', f'--junitxml={DIAGNOSTIC_XML}') if arguments.diagnostic_file else ()
-        if arguments.failed_cases_only:
-            diagnostic_options += ('-p', 'scripts.public_failure_probe')
+        diagnostic_options = (
+            '--tb=short', '-o', 'junit_family=xunit1', f'--junitxml={DIAGNOSTIC_XML}', '-p', 'scripts.public_failure_probe',
+        ) if arguments.diagnostic_file else ()
         status, receipt, cleaned = run_pytest(summary, environment, stage, selection, '--myrk-shard=other',
                                               f'--myrk-shard-manifest={manifest_path}', *deselection, *diagnostic_options)
         observation_path = report_file(receipt, 'observation.json')
