@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["E:/Myrk/desktop/node_modules/@types"],
+    "types": ["node", "react", "react-dom"],
+    "paths": {
+      "react": ["E:/Myrk/desktop/node_modules/@types/react/index.d.ts"],
+      "react/*": ["E:/Myrk/desktop/node_modules/@types/react/*"],
+      "react-dom": ["E:/Myrk/desktop/node_modules/@types/react-dom/index.d.ts"],
+      "react-dom/*": ["E:/Myrk/desktop/node_modules/@types/react-dom/*"]
+    }
+  },
+  "files": ["E:/Myrk/desktop/node_modules/vite/client.d.ts"],
+  "include": ["src/renderer/prototype/**/*.ts", "src/renderer/prototype/**/*.tsx"]
+}

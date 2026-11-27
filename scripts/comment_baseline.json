@@ -1,0 +1,23 @@
+{
+  ".githooks/pre-commit": ["#!/bin/sh"],
+  "desktop/src/main/approval-modes.integration.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/connection-handoff.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/connection-manager.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/connection-owner-bootstrap.ts": ["/* @vite-ignore */"],
+  "desktop/src/main/connection-persistence.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/connection-profile-context.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/connection-store.integration.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/connection-store.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/document-preview-electron.serial.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/document-preview.serial.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/exit-acceptance.integration.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/image-preview-electron.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/index.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/lifecycle.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/office-preview.serial.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/python-service.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/recovery.integration.test.ts": ["// @vitest-environment node"],
+  "desktop/src/main/workflow-acceptance.serial.test.ts": ["// @vitest-environment node"],
+  "myrk/request_observation.py": ["# type: ignore[method-assign]"],
+  "scripts/setup-executor.ps1": ["#requires -Version 7.0"]
+}

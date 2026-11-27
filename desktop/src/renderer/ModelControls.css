@@ -1,0 +1,33 @@
+.model-controls { margin-left: auto; min-width: 0; position: relative; }
+.model-selection-pill { display: flex; align-items: center; min-width: 0; max-width: 310px; border: 1px solid var(--ui-border); border-radius: 8px; background: var(--ui-surface-soft); padding: 1px 3px; }
+.model-selection-pill button { min-width: 0; min-height: 30px; display: flex; align-items: center; gap: 6px; padding: 5px 8px; font-size: 12px; border-radius: 6px; color: var(--ui-muted); }
+.model-selection-pill button:first-child { flex: 1; }
+.model-selection-pill button[aria-expanded="true"] { background: var(--ui-accent-soft); color: var(--ui-accent); }
+.selected-model-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.model-selection-pill .reasoning-choice { flex-shrink: 0; color: var(--ui-accent); padding-left: 9px; border-left: 1px solid var(--ui-border); border-radius: 0 6px 6px 0; }
+.model-controls-error { display: block; margin-top: 7px; width: min(310px, 75vw); background: var(--ui-danger-soft); border: 1px solid #e8c7c1; border-radius: 8px; padding: 9px 11px; color: var(--ui-danger); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.model-controls-popup { position: fixed; z-index: 60; width: 300px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 30px); border: 1px solid var(--ui-border-strong); border-radius: 12px; background: #fff; color: var(--ui-text); box-shadow: 0 8px 28px #21342a20; overflow: auto; }
+.reasoning-panel { padding: 15px 15px 13px; }
+.reasoning-panel header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.reasoning-panel header > div { min-width: 0; text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.reasoning-panel header strong { color: var(--ui-accent); font-size: 15px; font-weight: 600; }
+.reasoning-panel header > div > span { max-width: 207px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--ui-muted); }
+.reasoning-panel header button, .reasoning-bolt { color: var(--ui-muted); font-size: 21px; line-height: 26px; padding: 0 4px; }
+.reasoning-panel header button { min-width: 28px; min-height: 28px; }
+.reasoning-panel input[type="range"] { appearance: none; display: block; width: 100%; height: 14px; margin: 10px 0; border: 1px solid #bed0c2; border-radius: 20px; background: linear-gradient(90deg, #e0ebe1 0%, #8cac95 55%, #496f55 100%); cursor: pointer; }
+.reasoning-panel input[type="range"]::-webkit-slider-thumb { appearance: none; width: 25px; height: 25px; border: 2px solid #fff; border-radius: 50%; background: var(--ui-accent); box-shadow: 0 0 0 1px #aec1b3, 0 2px 4px #203a2520; }
+.reasoning-panel input[type="range"]:disabled { opacity: .45; cursor: default; }
+.reasoning-endpoints { display: flex; justify-content: space-between; margin-top: 9px; font-size: 12px; color: var(--ui-muted); }
+.reasoning-panel p { font-size: 12px; line-height: 1.75; color: var(--ui-muted); margin: 12px 0 0; overflow-wrap: anywhere; }
+.reasoning-initial-choice { border: 1px solid var(--ui-border-strong); background: var(--ui-accent-soft); color: var(--ui-accent); font-size: 13px; padding: 7px 10px; }
+.model-list-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 13px 8px; font-size: 13px; font-weight: 500; color: var(--ui-muted); }
+.model-list-panel { display: flex; flex-direction: column; overflow: hidden; }
+.model-list-panel .model-list-heading { flex-shrink: 0; }
+.model-list-heading button { font-size: 12px; padding: 4px 7px; font-weight: 400; color: var(--ui-accent); }
+.model-list-panel [role="listbox"] { padding: 3px 6px 7px; max-height: min(340px, 55vh); min-height: 0; overflow-y: auto; }
+.model-list-panel [role="option"] { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; padding: 9px 10px; margin: 2px 0; font-size: 13px; }
+.model-list-panel [role="option"][aria-selected="true"] { background: var(--ui-accent-soft); color: var(--ui-accent); }
+.model-list-panel [role="option"] > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.model-list-panel [role="option"] small { display: block; font-size: 12px; line-height: 1.6; color: var(--ui-muted); margin-top: 3px; }
+@media (max-width: 1050px) { .model-selection-pill { max-width: 255px; } }
+@media (max-width: 800px) { .model-selection-pill { max-width: 270px; } }

@@ -1,0 +1,2435 @@
+{
+  "fixture_format": 1,
+  "core_contract_version": 1,
+  "approved_change": "2026-11-09: initial contract after tickets 02/03; frozen persisted request layout and search_extensions/describe_extension/call_extension; calculate_table remains hidden. Captured at 8cc39f1 with MockTransport and manually reviewed against real assembly paths.",
+  "sdk": {
+    "pydantic-ai-slim": "2.64.0",
+    "openai": "3.42.0"
+  },
+  "protocols": [
+    "deepseek",
+    "openai-chat"
+  ],
+  "cases": {
+    "bridge-only": {
+      "conditions": "Public Agent; empty ExtensionCatalog; fixed instructions; no Conversation tools.",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "search_extensions",
+            "description": "Find available extension tools by exact name or words in their description; then describe a selected tool.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "describe_extension",
+            "description": "Get an available extension's exact parameter schema and current schema_version before calling it.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "call_extension",
+            "description": "Call a described extension with its current schema_version and arguments through the existing execution boundary.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "schema_version": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "properties": {}
+                }
+              },
+              "required": [
+                "name",
+                "schema_version",
+                "arguments"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "main-unscoped": {
+      "conditions": "Conversation main; no task folder, document, project skills or discovered extensions.",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "search_extensions",
+            "description": "Find available extension tools by exact name or words in their description; then describe a selected tool.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "describe_extension",
+            "description": "Get an available extension's exact parameter schema and current schema_version before calling it.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "call_extension",
+            "description": "Call a described extension with its current schema_version and arguments through the existing execution boundary.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "schema_version": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "properties": {}
+                }
+              },
+              "required": [
+                "name",
+                "schema_version",
+                "arguments"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "memory",
+            "description": "Proactively save concise useful personal preferences or current-project experience; notes never grant authority.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": [
+                    "add",
+                    "replace",
+                    "patch",
+                    "remove",
+                    "batch",
+                    "list"
+                  ],
+                  "type": "string"
+                },
+                "text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "old_text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "replacement": {
+                  "default": "",
+                  "type": "string"
+                },
+                "scope": {
+                  "default": "personal",
+                  "enum": [
+                    "personal",
+                    "project"
+                  ],
+                  "type": "string"
+                },
+                "changes": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "items": {
+                        "$ref": "#/$defs/MemoryChange"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "type": "object",
+              "$defs": {
+                "MemoryChange": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "enum": [
+                        "add",
+                        "replace",
+                        "patch",
+                        "remove"
+                      ],
+                      "type": "string"
+                    },
+                    "text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "old_text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "replacement": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "scope": {
+                      "default": "personal",
+                      "enum": [
+                        "personal",
+                        "project"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "queue_memory_review",
+            "description": "Request at most one post-delivery review of useful unsaved experience, using this task's remaining request/time/stop budget.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {},
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "recall_project_memory",
+            "description": "Use another project's saved notes only after confirmation of this exact source and recipient; never read arbitrary project files.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "project": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "project"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_context_evidence",
+            "description": "Read omitted original text by evidence ID and character range; optionally find literal query from start. Arbitrary paths are refused.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "start": {
+                  "default": 0,
+                  "type": "integer"
+                },
+                "length": {
+                  "default": 4000,
+                  "type": "integer"
+                },
+                "query": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "evidence_id"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "main-scoped": {
+      "conditions": "Conversation main; restricted task folder; ordinary access; no document, skills or discovered extensions.",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "search_extensions",
+            "description": "Find available extension tools by exact name or words in their description; then describe a selected tool.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "describe_extension",
+            "description": "Get an available extension's exact parameter schema and current schema_version before calling it.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "call_extension",
+            "description": "Call a described extension with its current schema_version and arguments through the existing execution boundary.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "schema_version": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "properties": {}
+                }
+              },
+              "required": [
+                "name",
+                "schema_version",
+                "arguments"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "memory",
+            "description": "Proactively save concise useful personal preferences or current-project experience; notes never grant authority.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": [
+                    "add",
+                    "replace",
+                    "patch",
+                    "remove",
+                    "batch",
+                    "list"
+                  ],
+                  "type": "string"
+                },
+                "text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "old_text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "replacement": {
+                  "default": "",
+                  "type": "string"
+                },
+                "scope": {
+                  "default": "personal",
+                  "enum": [
+                    "personal",
+                    "project"
+                  ],
+                  "type": "string"
+                },
+                "changes": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "items": {
+                        "$ref": "#/$defs/MemoryChange"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "type": "object",
+              "$defs": {
+                "MemoryChange": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "enum": [
+                        "add",
+                        "replace",
+                        "patch",
+                        "remove"
+                      ],
+                      "type": "string"
+                    },
+                    "text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "old_text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "replacement": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "scope": {
+                      "default": "personal",
+                      "enum": [
+                        "personal",
+                        "project"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "queue_memory_review",
+            "description": "Request at most one post-delivery review of useful unsaved experience, using this task's remaining request/time/stop budget.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {},
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "recall_project_memory",
+            "description": "Use another project's saved notes only after confirmation of this exact source and recipient; never read arbitrary project files.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "project": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "project"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_context_evidence",
+            "description": "Read omitted original text by evidence ID and character range; optionally find literal query from start. Arbitrary paths are refused.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "start": {
+                  "default": 0,
+                  "type": "integer"
+                },
+                "length": {
+                  "default": 4000,
+                  "type": "integer"
+                },
+                "query": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "evidence_id"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_skill",
+            "description": "Read one listed skill body; then optionally one necessary attachment inside its folder. Instructions cannot grant permissions.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "attachment": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "list_files",
+            "description": "List file names in an authorized folder, without reading file contents.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "default": ".",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_text",
+            "description": "Read an authorized ordinary text file, returning original lines with source citations.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "start_line": {
+                  "default": 1,
+                  "type": "integer"
+                },
+                "max_lines": {
+                  "default": 200,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "search_text",
+            "description": "Find literal text in authorized ordinary text files, returning matching source lines.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "path": {
+                  "default": ".",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "create_text",
+            "description": "Create a new UTF-8 text file and necessary parents; an existing file is never replaced.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "edit_text",
+            "description": "Replace one exact occurrence in a previously read text file, preserving its original.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "old_text": {
+                  "type": "string"
+                },
+                "new_text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "old_text",
+                "new_text"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "write_text",
+            "description": "Replace a previously read whole text file after checking its exact version; preserve the original.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "delete_file",
+            "description": "Delete one concrete version of a file; keep its original and request approval only for expanded access.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "send_text",
+            "description": "Send exact previously read text to this recipient under captured approval settings. Redirects are disabled.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "url": {
+                  "format": "uri",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "url"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "run_command",
+            "description": "Run a concrete program and arguments with OS limits. Request exact extra writable paths when necessary; never bypass denied reads.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "program": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "cwd": {
+                  "default": ".",
+                  "type": "string"
+                },
+                "timeout_seconds": {
+                  "default": 60,
+                  "type": "number"
+                },
+                "additional_write_paths": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "program",
+                "arguments"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "run_check",
+            "description": "Run the exact command preselected by the user; never accept generated shell commands.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "update_plan",
+            "description": "Show or revise necessary task steps. A plan does not execute actions or grant permissions.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "steps": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "steps"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "delegate_work",
+            "description": "Delegate one separable job sequentially, with goal, necessary context, inherited scope and expected real files. Main must verify its report.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "goal": {
+                  "type": "string"
+                },
+                "context": {
+                  "type": "string"
+                },
+                "evidence_requirements": {
+                  "type": "string"
+                },
+                "expected_files": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "scope": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TaskScope"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "goal",
+                "context",
+                "evidence_requirements",
+                "expected_files"
+              ],
+              "type": "object",
+              "$defs": {
+                "CheckCommand": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "argv": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "cwd": {
+                      "default": ".",
+                      "type": "string"
+                    },
+                    "timeout_seconds": {
+                      "default": 60,
+                      "exclusiveMinimum": 0,
+                      "maximum": 60,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "argv"
+                  ],
+                  "type": "object"
+                },
+                "TaskScope": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "root": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "allowed_actions": {
+                      "items": {
+                        "enum": [
+                          "list",
+                          "read",
+                          "search",
+                          "edit",
+                          "calculate",
+                          "check"
+                        ],
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "provider": {
+                      "enum": [
+                        "deepseek",
+                        "openai-compatible"
+                      ],
+                      "type": "string"
+                    },
+                    "recipients": {
+                      "items": {
+                        "enum": [
+                          "deepseek",
+                          "openai-compatible"
+                        ],
+                        "type": "string"
+                      },
+                      "maxItems": 1,
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "checks": {
+                      "items": {
+                        "$ref": "#/$defs/CheckCommand"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "root",
+                    "allowed_actions",
+                    "provider",
+                    "recipients"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "verify_delegation",
+            "description": "Main reads a declared artifact and compares its full real text with independently expected content, not the delegate report.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "delegation_id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "expected_text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "delegation_id",
+                "path",
+                "expected_text"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        }
+      ]
+    },
+    "main-document": {
+      "conditions": "Conversation main; single authorized text document; no task folder.",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "search_extensions",
+            "description": "Find available extension tools by exact name or words in their description; then describe a selected tool.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "describe_extension",
+            "description": "Get an available extension's exact parameter schema and current schema_version before calling it.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "call_extension",
+            "description": "Call a described extension with its current schema_version and arguments through the existing execution boundary.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "schema_version": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "properties": {}
+                }
+              },
+              "required": [
+                "name",
+                "schema_version",
+                "arguments"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "memory",
+            "description": "Proactively save concise useful personal preferences or current-project experience; notes never grant authority.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": [
+                    "add",
+                    "replace",
+                    "patch",
+                    "remove",
+                    "batch",
+                    "list"
+                  ],
+                  "type": "string"
+                },
+                "text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "old_text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "replacement": {
+                  "default": "",
+                  "type": "string"
+                },
+                "scope": {
+                  "default": "personal",
+                  "enum": [
+                    "personal",
+                    "project"
+                  ],
+                  "type": "string"
+                },
+                "changes": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "items": {
+                        "$ref": "#/$defs/MemoryChange"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "type": "object",
+              "$defs": {
+                "MemoryChange": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "enum": [
+                        "add",
+                        "replace",
+                        "patch",
+                        "remove"
+                      ],
+                      "type": "string"
+                    },
+                    "text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "old_text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "replacement": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "scope": {
+                      "default": "personal",
+                      "enum": [
+                        "personal",
+                        "project"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "queue_memory_review",
+            "description": "Request at most one post-delivery review of useful unsaved experience, using this task's remaining request/time/stop budget.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {},
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "recall_project_memory",
+            "description": "Use another project's saved notes only after confirmation of this exact source and recipient; never read arbitrary project files.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "project": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "project"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_authorized_text",
+            "description": "Read the single text document authorized for this turn.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {},
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_context_evidence",
+            "description": "Read omitted original text by evidence ID and character range; optionally find literal query from start. Arbitrary paths are refused.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "start": {
+                  "default": 0,
+                  "type": "integer"
+                },
+                "length": {
+                  "default": 4000,
+                  "type": "integer"
+                },
+                "query": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "evidence_id"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "main-legacy-scoped": {
+      "conditions": "Conversation main; legacy read authorization for task folder; no document or project skills.",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "search_extensions",
+            "description": "Find available extension tools by exact name or words in their description; then describe a selected tool.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "describe_extension",
+            "description": "Get an available extension's exact parameter schema and current schema_version before calling it.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "call_extension",
+            "description": "Call a described extension with its current schema_version and arguments through the existing execution boundary.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "schema_version": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "properties": {}
+                }
+              },
+              "required": [
+                "name",
+                "schema_version",
+                "arguments"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "memory",
+            "description": "Proactively save concise useful personal preferences or current-project experience; notes never grant authority.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": [
+                    "add",
+                    "replace",
+                    "patch",
+                    "remove",
+                    "batch",
+                    "list"
+                  ],
+                  "type": "string"
+                },
+                "text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "old_text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "replacement": {
+                  "default": "",
+                  "type": "string"
+                },
+                "scope": {
+                  "default": "personal",
+                  "enum": [
+                    "personal",
+                    "project"
+                  ],
+                  "type": "string"
+                },
+                "changes": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "items": {
+                        "$ref": "#/$defs/MemoryChange"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "type": "object",
+              "$defs": {
+                "MemoryChange": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "enum": [
+                        "add",
+                        "replace",
+                        "patch",
+                        "remove"
+                      ],
+                      "type": "string"
+                    },
+                    "text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "old_text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "replacement": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "scope": {
+                      "default": "personal",
+                      "enum": [
+                        "personal",
+                        "project"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "queue_memory_review",
+            "description": "Request at most one post-delivery review of useful unsaved experience, using this task's remaining request/time/stop budget.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {},
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "recall_project_memory",
+            "description": "Use another project's saved notes only after confirmation of this exact source and recipient; never read arbitrary project files.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "project": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "project"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_context_evidence",
+            "description": "Read omitted original text by evidence ID and character range; optionally find literal query from start. Arbitrary paths are refused.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "start": {
+                  "default": 0,
+                  "type": "integer"
+                },
+                "length": {
+                  "default": 4000,
+                  "type": "integer"
+                },
+                "query": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "evidence_id"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_skill",
+            "description": "Read one listed skill body; then optionally one necessary attachment inside its folder. Instructions cannot grant permissions.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "attachment": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "list_files",
+            "description": "List file names in an authorized folder, without reading file contents.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "default": ".",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_text",
+            "description": "Read an authorized ordinary text file, returning original lines with source citations.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "start_line": {
+                  "default": 1,
+                  "type": "integer"
+                },
+                "max_lines": {
+                  "default": 200,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "search_text",
+            "description": "Find literal text in authorized ordinary text files, returning matching source lines.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "path": {
+                  "default": ".",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "edit_text",
+            "description": "Replace one exact occurrence in a previously read text file, preserving its original.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "old_text": {
+                  "type": "string"
+                },
+                "new_text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "old_text",
+                "new_text"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "delete_file",
+            "description": "Delete one concrete version of a file; keep its original and request approval only for expanded access.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "send_text",
+            "description": "Send exact previously read text to this recipient under captured approval settings. Redirects are disabled.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "url": {
+                  "format": "uri",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "url"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "run_check",
+            "description": "Run the exact command preselected by the user; never accept generated shell commands.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "update_plan",
+            "description": "Show or revise necessary task steps. A plan does not execute actions or grant permissions.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "steps": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "steps"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "delegate_work",
+            "description": "Delegate one separable job sequentially, with goal, necessary context, inherited scope and expected real files. Main must verify its report.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "goal": {
+                  "type": "string"
+                },
+                "context": {
+                  "type": "string"
+                },
+                "evidence_requirements": {
+                  "type": "string"
+                },
+                "expected_files": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "scope": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/TaskScope"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "goal",
+                "context",
+                "evidence_requirements",
+                "expected_files"
+              ],
+              "type": "object",
+              "$defs": {
+                "CheckCommand": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "argv": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "cwd": {
+                      "default": ".",
+                      "type": "string"
+                    },
+                    "timeout_seconds": {
+                      "default": 60,
+                      "exclusiveMinimum": 0,
+                      "maximum": 60,
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "argv"
+                  ],
+                  "type": "object"
+                },
+                "TaskScope": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "root": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "allowed_actions": {
+                      "items": {
+                        "enum": [
+                          "list",
+                          "read",
+                          "search",
+                          "edit",
+                          "calculate",
+                          "check"
+                        ],
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "provider": {
+                      "enum": [
+                        "deepseek",
+                        "openai-compatible"
+                      ],
+                      "type": "string"
+                    },
+                    "recipients": {
+                      "items": {
+                        "enum": [
+                          "deepseek",
+                          "openai-compatible"
+                        ],
+                        "type": "string"
+                      },
+                      "maxItems": 1,
+                      "minItems": 1,
+                      "type": "array"
+                    },
+                    "checks": {
+                      "items": {
+                        "$ref": "#/$defs/CheckCommand"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "root",
+                    "allowed_actions",
+                    "provider",
+                    "recipients"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "verify_delegation",
+            "description": "Main reads a declared artifact and compares its full real text with independently expected content, not the delegate report.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "delegation_id": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "expected_text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "delegation_id",
+                "path",
+                "expected_text"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        }
+      ]
+    },
+    "delegation-scoped": {
+      "conditions": "Real delegate_work child; inherited task folder and read scope; independent child request budget.",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "search_extensions",
+            "description": "Find available extension tools by exact name or words in their description; then describe a selected tool.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "query": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "describe_extension",
+            "description": "Get an available extension's exact parameter schema and current schema_version before calling it.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "call_extension",
+            "description": "Call a described extension with its current schema_version and arguments through the existing execution boundary.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "schema_version": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "properties": {}
+                }
+              },
+              "required": [
+                "name",
+                "schema_version",
+                "arguments"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_context_evidence",
+            "description": "Read omitted original text by evidence ID and character range; optionally find literal query from start. Arbitrary paths are refused.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "evidence_id": {
+                  "type": "string"
+                },
+                "start": {
+                  "default": 0,
+                  "type": "integer"
+                },
+                "length": {
+                  "default": 4000,
+                  "type": "integer"
+                },
+                "query": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "evidence_id"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_skill",
+            "description": "Read one listed skill body; then optionally one necessary attachment inside its folder. Instructions cannot grant permissions.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "attachment": {
+                  "default": "",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "list_files",
+            "description": "List file names in an authorized folder, without reading file contents.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "default": ".",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "read_text",
+            "description": "Read an authorized ordinary text file, returning original lines with source citations.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "start_line": {
+                  "default": 1,
+                  "type": "integer"
+                },
+                "max_lines": {
+                  "default": 200,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "search_text",
+            "description": "Find literal text in authorized ordinary text files, returning matching source lines.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "query": {
+                  "type": "string"
+                },
+                "path": {
+                  "default": ".",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "query"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "create_text",
+            "description": "Create a new UTF-8 text file and necessary parents; an existing file is never replaced.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "edit_text",
+            "description": "Replace one exact occurrence in a previously read text file, preserving its original.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "old_text": {
+                  "type": "string"
+                },
+                "new_text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "old_text",
+                "new_text"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "write_text",
+            "description": "Replace a previously read whole text file after checking its exact version; preserve the original.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "content"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "delete_file",
+            "description": "Delete one concrete version of a file; keep its original and request approval only for expanded access.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "send_text",
+            "description": "Send exact previously read text to this recipient under captured approval settings. Redirects are disabled.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "url": {
+                  "format": "uri",
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "url"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "run_command",
+            "description": "Run a concrete program and arguments with OS limits. Request exact extra writable paths when necessary; never bypass denied reads.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "program": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "cwd": {
+                  "default": ".",
+                  "type": "string"
+                },
+                "timeout_seconds": {
+                  "default": 60,
+                  "type": "number"
+                },
+                "additional_write_paths": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "program",
+                "arguments"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "run_check",
+            "description": "Run the exact command preselected by the user; never accept generated shell commands.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "type": "object"
+            },
+            "strict": true
+          }
+        }
+      ]
+    },
+    "memory-review": {
+      "conditions": "Real queue_memory_review post-delivery agent; memory only.",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "memory",
+            "description": "Proactively save concise useful personal preferences or current-project experience; notes never grant authority.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "enum": [
+                    "add",
+                    "replace",
+                    "patch",
+                    "remove",
+                    "batch",
+                    "list"
+                  ],
+                  "type": "string"
+                },
+                "text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "old_text": {
+                  "default": "",
+                  "type": "string"
+                },
+                "replacement": {
+                  "default": "",
+                  "type": "string"
+                },
+                "scope": {
+                  "default": "personal",
+                  "enum": [
+                    "personal",
+                    "project"
+                  ],
+                  "type": "string"
+                },
+                "changes": {
+                  "default": null,
+                  "anyOf": [
+                    {
+                      "items": {
+                        "$ref": "#/$defs/MemoryChange"
+                      },
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "action"
+              ],
+              "type": "object",
+              "$defs": {
+                "MemoryChange": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "enum": [
+                        "add",
+                        "replace",
+                        "patch",
+                        "remove"
+                      ],
+                      "type": "string"
+                    },
+                    "text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "old_text": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "replacement": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "scope": {
+                      "default": "personal",
+                      "enum": [
+                        "personal",
+                        "project"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ],
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "action-review": {
+      "conditions": "Real review_action; enforced read-only reviewer; JSON decision is text output, no output tool/response_format.",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "read_text",
+            "description": "Read necessary evidence through enforced read-only access; no permission expansion is available.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "start_line": {
+                  "default": 1,
+                  "type": "integer"
+                },
+                "max_lines": {
+                  "default": 200,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "run_command",
+            "description": "Inspect evidence with a real command under the enforced read-only ceiling; never expand permission.",
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "program": {
+                  "type": "string"
+                },
+                "arguments": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "cwd": {
+                  "default": ".",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "program",
+                "arguments"
+              ],
+              "type": "object"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

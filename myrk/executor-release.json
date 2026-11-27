@@ -1,0 +1,7 @@
+{
+  "release": "0.166.0",
+  "executable": "codex-exec-server-x86_64-pc-windows-msvc.exe",
+  "sha256": "eda5263b31e0354347e7bcdc434aff82f5c630ddba69f13449742a64e1836a37",
+  "archive_url": "https://github.com/openai/codex/releases/download/rust-v0.166.0/codex-exec-server-x86_64-pc-windows-msvc.exe.zip",
+  "archive_sha256": "2fed7e6547c2af2f86bba0b537f4fcddaabb2565cbc30d1639f87eb607ae3ecf"
+}

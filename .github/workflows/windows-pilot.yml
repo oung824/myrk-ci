@@ -1,0 +1,68 @@
+name: Windows offline pilot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pilot:
+    name: ${{ matrix.name }}
+    runs-on: windows-2025
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - check: python-types
+            name: Backend type check
+            runtime: python
+          - check: backend-records
+            name: Backend smoke - conversation records and context
+            runtime: python
+          - check: backend-executor
+            name: Backend smoke - executor output
+            runtime: python
+          - check: typescript-types
+            name: Desktop type check
+            runtime: node
+          - check: desktop-contracts
+            name: Desktop smoke - runner contracts
+            runtime: node
+          - check: office-com
+            name: Office COM availability
+            runtime: office
+    env:
+      MYRK_PILOT_CHECK: ${{ matrix.check }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the pilot snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        if: matrix.runtime == 'node'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.20.0'
+          architecture: x64
+          package-manager-cache: false
+      - name: Install locked project dependencies
+        if: matrix.runtime != 'office'
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check $env:MYRK_PILOT_CHECK
+      - name: Run the selected check
+        if: matrix.runtime != 'office'
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase check -Check $env:MYRK_PILOT_CHECK
+      - name: Probe Word, Excel and PowerPoint
+        if: matrix.runtime == 'office'
+        timeout-minutes: 3
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase check -Check $env:MYRK_PILOT_CHECK

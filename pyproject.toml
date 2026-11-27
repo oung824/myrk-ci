@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+cache_dir = ".scratch/check-runs/cache/pytest"
+
+[tool.mypy]
+files = ["myrk"]
+strict = true
+cache_dir = ".scratch/check-runs/cache/mypy"
