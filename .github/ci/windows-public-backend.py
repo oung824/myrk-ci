@@ -33,6 +33,7 @@ GROUPS = {
         'test_process_receipt', 'test_project_paths', 'test_runtime_resources',
     ),
     'layout-context': ('test_layout_context',),
+    'judge-fixtures': ('acceptance/test_judge_full_ledger', 'acceptance/test_judge_native_roundtrip'),
 }
 PHASES = {'setup', 'call', 'teardown'}
 RESULTS = ROOT / '.scratch/check-runs/results'
