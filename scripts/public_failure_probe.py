@@ -142,5 +142,5 @@ def pytest_runtest_makereport(item, call):
     function = item.nodeid.partition("::")[2].partition("[")[0]
     for entry in reversed(call.excinfo.traceback):
         if entry.name == function and entry.lineno + 1 == line:
-            report.user_properties.extend(extract(entry.locals).items())
+            item.user_properties.extend(extract(entry.locals).items())
             return
