@@ -2,6 +2,12 @@ name: Windows public backend diagnostic
 
 on:
   workflow_dispatch:
+    inputs:
+      focus:
+        description: Run the four reproduced cases or each full file
+        type: choice
+        options: [cases, files]
+        default: cases
 
 permissions:
   contents: read
@@ -41,6 +47,9 @@ jobs:
         env:
           MYRK_DIAGNOSTIC_GROUP: ${{ matrix.group }}
           MYRK_DIAGNOSTIC_FILE: ${{ matrix.test_file }}
+          MYRK_DIAGNOSTIC_FOCUS: ${{ inputs.focus }}
         run: |
-          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_DIAGNOSTIC_GROUP --diagnostic-file $env:MYRK_DIAGNOSTIC_FILE
+          $options = @()
+          if ($env:MYRK_DIAGNOSTIC_FOCUS -eq 'cases') { $options += '--failed-cases-only' }
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_DIAGNOSTIC_GROUP --diagnostic-file $env:MYRK_DIAGNOSTIC_FILE @options
           exit $LASTEXITCODE

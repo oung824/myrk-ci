@@ -116,7 +116,28 @@ DIAGNOSTIC_FILES = {
     'test_recovery': 'recovery',
     'acceptance/test_actions': 'synthetic-acceptance',
 }
+DIAGNOSTIC_CASES = {
+    'test_action_reporting_facts': (
+        'test_bounded_action_summary_keeps_preparation_read_when_deletion_is_declined',
+    ),
+    'test_recovery': (
+        'test_interrupted_real_edit_is_verified_then_resumed_without_repeating[after_check]',
+        'test_running_check_is_observed_without_retry_until_its_receipt_exists',
+    ),
+    'acceptance/test_actions': ('test_local_effect_branches_keep_real_results[read-denied]',),
+}
 DIAGNOSTIC_XML = 'public-diagnostic.xml'
+DIAGNOSTIC_BOOLEAN_FIELDS = {
+    'summary_delete_target_over_120',
+    'read_denied_turn_completed', 'read_denied_source_unchanged', 'read_denied_canary_in_action_output',
+    'read_denied_sdk_evidence_available', 'read_denied_canary_in_sdk',
+    'read_denied_os_error_5', 'read_denied_zh_message', 'read_denied_en_message',
+    'read_denied_executor_reply', 'read_denied_scope_self_check',
+    'recovery_marker_present', 'recovery_check_pid_present', 'recovery_script_effect_present',
+    'recovery_service_pid_present', 'recovery_edit_applied', 'recovery_record_available',
+    'recovery_check_started', 'recovery_check_result', 'recovery_check_receipt_exists',
+    'recovery_check_started_file_exists',
+}
 
 
 class CheckError(Exception):
@@ -250,6 +271,14 @@ def publish_test_diagnostic(summary, xml_path, selected_path, outcomes):
             continue
         label = name if node[2] is None or node[2] in labels else node[1]
         publish(summary, f'- Failed case: {selected_path}::{label}.')
+        for field in case.findall('properties/property'):
+            key, value = field.get('name'), field.get('value', '')
+            if (key in DIAGNOSTIC_BOOLEAN_FIELDS and value in {'True', 'False', 'true', 'false'}
+                    or key == 'summary_truncation_count' and re.fullmatch(r'(?:[0-9]|10)', value)
+                    or key == 'read_denied_action_status' and value in {
+                        'awaiting_approval', 'cancelled', 'completed', 'conflict', 'denied', 'failed', 'started', 'unknown',
+                    }):
+                publish(summary, f'- Failure probe {key}={value.lower()}.')
         for failure in (*case.findall('failure'), *case.findall('error')):
             frames = re.findall(r'^([^\r\n]+\.py):([0-9]+):\s*([A-Za-z][A-Za-z0-9_]*)',
                                 failure.text or '', re.MULTILINE)
@@ -288,12 +317,15 @@ def main():
     parser.add_argument('group', choices=GROUPS)
     parser.add_argument('--native-only', action='store_true')
     parser.add_argument('--diagnostic-file', choices=DIAGNOSTIC_FILES)
+    parser.add_argument('--failed-cases-only', action='store_true')
     arguments = parser.parse_args()
     group = arguments.group
     if arguments.native_only and group != 'judge-fixtures':
         parser.error('--native-only requires the judge-fixtures group')
     if arguments.diagnostic_file and (group != DIAGNOSTIC_FILES[arguments.diagnostic_file] or arguments.native_only):
         parser.error('--diagnostic-file must match its registered group')
+    if arguments.failed_cases_only and not arguments.diagnostic_file:
+        parser.error('--failed-cases-only requires --diagnostic-file')
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     environment = dict(os.environ, PYTHONIOENCODING='utf-8', MYRK_TASK_ID=f'github-public-backend-{group}')
     for name in ('GITHUB_STEP_SUMMARY', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE',
@@ -305,9 +337,12 @@ def main():
     if arguments.diagnostic_file:
         names = (arguments.diagnostic_file,)
     paths = tuple(f'tests/{name}.py' for name in names)
+    selection = paths
+    if arguments.failed_cases_only:
+        selection = tuple(f'{paths[0]}::{node}' for node in DIAGNOSTIC_CASES[arguments.diagnostic_file])
     exclusions = DESELECT.get(group, ())
     deselection = tuple(f'--deselect={node}' for node in exclusions)
-    for path in paths:
+    for path in selection:
         publish(summary, f'- `{path}`')
     started = monotonic()
     stage = 'inventory'
@@ -316,7 +351,7 @@ def main():
         if len(inventory) != len(set(inventory)) or any(not (ROOT / path).is_file() for path in paths):
             raise CheckError('A test file is duplicated across groups or missing from this group.')
         stage = 'collection'
-        status, receipt, cleaned = run_pytest(summary, environment, stage, paths, '--collect-only', '--myrk-shard=collect',
+        status, receipt, cleaned = run_pytest(summary, environment, stage, selection, '--collect-only', '--myrk-shard=collect',
                                               *deselection)
         if status or not cleaned:
             raise CheckError('Collection or its process cleanup failed.')
@@ -327,12 +362,16 @@ def main():
         publish(summary, f'- Collected {len(expected)} tests across {len(counts)}/{len(paths)} selected files.')
         if set(counts) != set(paths) or len(expected) != len(set(expected)):
             raise CheckError('The collected files or test identities differ from the selection.')
+        if arguments.failed_cases_only and set(expected) != set(selection):
+            raise CheckError('The collected cases differ from the reproduced failures.')
         if not arguments.diagnostic_file and group in SYNTHETIC_COUNTS and (len(expected) != SYNTHETIC_COUNTS[group]
                 or any(node.startswith(exclusions) for node in expected)):
             raise CheckError('The synthetic case selection differs from the reviewed scope.')
         stage = 'execution'
         diagnostic_options = ('--tb=short', '-o', 'junit_family=xunit1', f'--junitxml={DIAGNOSTIC_XML}') if arguments.diagnostic_file else ()
-        status, receipt, cleaned = run_pytest(summary, environment, stage, paths, '--myrk-shard=other',
+        if arguments.failed_cases_only:
+            diagnostic_options += ('-p', 'scripts.public_failure_probe')
+        status, receipt, cleaned = run_pytest(summary, environment, stage, selection, '--myrk-shard=other',
                                               f'--myrk-shard-manifest={manifest_path}', *deselection, *diagnostic_options)
         observation_path = report_file(receipt, 'observation.json')
         observation = read_json(observation_path)
