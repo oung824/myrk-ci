@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GROUPS = {
     'records-and-context': (
         'test_conversation_format', 'test_context_task_goal', 'test_input_measurement_compatibility',
-        'test_layout_context', 'test_legacy_conversation_export', 'test_message_persistence_compatibility',
+        'test_legacy_conversation_export', 'test_message_persistence_compatibility',
         'test_rendered_input_budget',
     ),
     'compaction-and-budget': (
@@ -32,6 +32,7 @@ GROUPS = {
         'test_bare_check_paths', 'test_check_task_id', 'test_closeout', 'test_navigation',
         'test_process_receipt', 'test_project_paths', 'test_runtime_resources',
     ),
+    'layout-context': ('test_layout_context',),
 }
 PHASES = {'setup', 'call', 'teardown'}
 RESULTS = ROOT / '.scratch/check-runs/results'
@@ -117,7 +118,7 @@ def main():
                  'PYTEST_ADDOPTS', 'PYTEST_PLUGINS'):
         environment.pop(name, None)
     publish(summary, f'### Public offline backend · {group}')
-    publish(summary, 'Selected backend test files on windows-2025.')
+    publish(summary, 'Selected backend test files on a Windows hosted runner.')
     paths = tuple(f'tests/{name}.py' for name in GROUPS[group])
     for path in paths:
         publish(summary, f'- `{path}`')

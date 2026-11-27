@@ -9,14 +9,21 @@ permissions:
 jobs:
   backend:
     name: Backend ${{ matrix.group }}
-    runs-on: windows-2025
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        group: [records-and-context, compaction-and-budget, model-protocols, desktop-service, check-resources]
+        include:
+          - {group: records-and-context, runner: windows-2025, installer: backend-public}
+          - {group: compaction-and-budget, runner: windows-2025, installer: backend-public}
+          - {group: model-protocols, runner: windows-2025, installer: backend-public}
+          - {group: desktop-service, runner: windows-2025, installer: backend-public}
+          - {group: check-resources, runner: windows-2025, installer: backend-public}
+          - {group: layout-context, runner: windows-11-arm, installer: backend-executor}
     env:
       MYRK_CI_GROUP: ${{ matrix.group }}
+      MYRK_CI_INSTALLER: ${{ matrix.installer }}
     defaults:
       run:
         shell: pwsh
@@ -28,7 +35,7 @@ jobs:
       - name: Install locked Python dependencies
         run: >-
           & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
-          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-public
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check $env:MYRK_CI_INSTALLER
       - name: Collect and run the selected offline tests
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_GROUP
