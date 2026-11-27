@@ -131,6 +131,38 @@ def read_json(path):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
+def publish_judge_diagnostic(summary, observation_path):
+    reports = observation_path.parent.parent
+    for result_path in reports.glob('ordinary-public/*/result.json'):
+        if not result_path.resolve().is_relative_to(reports.resolve()):
+            continue
+        result = read_json(result_path)
+        for item in result.get('cases', []):
+            facts = item.get('facts', {})
+            budget = facts.get('budget', {})
+            numbers = [budget.get(field) for field in ('actual_http', 'reserved_requests', 'completed_responses')]
+            if any(type(number) is not int or not 0 <= number <= 130 for number in numbers):
+                continue
+            status = item.get('product_status')
+            if status not in ('passed', 'failed', 'inconclusive', 'not_executed'):
+                status = 'unknown'
+            if facts.get('reason') == 'dependency did not pass':
+                category = 'prerequisite'
+            elif facts.get('unfinished'):
+                category = 'budget-stop'
+            elif facts.get('error_type') in (
+                'AssertionError', 'FileNotFoundError', 'PermissionError', 'OSError', 'RuntimeError',
+                'ValueError', 'APIConnectionError', 'RequestError', 'TimeoutError',
+            ):
+                category = facts['error_type']
+            elif facts.get('error') or facts.get('error_type'):
+                category = 'other-error'
+            else:
+                category = 'none'
+            publish(summary, f'- Synthetic judge outcome: {status}, {category}, '
+                             f'{numbers[0]} HTTP, {numbers[1]} reserved, {numbers[2]} completed.')
+
+
 def node_outcomes(expected, observation):
     reports_by_node = defaultdict(list)
     for report in observation['reports']:
@@ -155,7 +187,11 @@ def node_outcomes(expected, observation):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('group', choices=GROUPS)
-    group = parser.parse_args().group
+    parser.add_argument('--native-only', action='store_true')
+    arguments = parser.parse_args()
+    group = arguments.group
+    if arguments.native_only and group != 'judge-fixtures':
+        parser.error('--native-only requires the judge-fixtures group')
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     environment = dict(os.environ, PYTHONIOENCODING='utf-8', MYRK_TASK_ID=f'github-public-backend-{group}')
     for name in ('GITHUB_STEP_SUMMARY', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE',
@@ -163,7 +199,8 @@ def main():
         environment.pop(name, None)
     publish(summary, f'### Public offline backend · {group}')
     publish(summary, 'Selected backend test files on a Windows hosted runner.')
-    paths = tuple(f'tests/{name}.py' for name in GROUPS[group])
+    names = ('acceptance/test_judge_native_roundtrip',) if arguments.native_only else GROUPS[group]
+    paths = tuple(f'tests/{name}.py' for name in names)
     for path in paths:
         publish(summary, f'- `{path}`')
     started = monotonic()
@@ -186,7 +223,10 @@ def main():
         stage = 'execution'
         status, receipt, cleaned = run_pytest(summary, environment, stage, paths, '--myrk-shard=other',
                                               f'--myrk-shard-manifest={manifest_path}')
-        observation = read_json(report_file(receipt, 'observation.json'))
+        observation_path = report_file(receipt, 'observation.json')
+        observation = read_json(observation_path)
+        if status and arguments.native_only:
+            publish_judge_diagnostic(summary, observation_path)
         outcomes, unexpected = node_outcomes(expected, observation)
         totals = Counter(outcomes.values())
         publish(summary, f'- Outcomes: {totals["passed"]} passed, {totals["failed"]} failed, '

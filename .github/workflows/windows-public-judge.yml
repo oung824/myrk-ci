@@ -2,6 +2,12 @@ name: Windows public offline judge
 
 on:
   workflow_dispatch:
+    inputs:
+      focus:
+        description: Run both synthetic checks or diagnose only the native SDK case
+        type: choice
+        options: [all, native]
+        default: all
 
 permissions:
   contents: read
@@ -29,6 +35,10 @@ jobs:
           New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
           Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
       - name: Run the synthetic ledger and native SDK judge tests
+        env:
+          MYRK_CI_JUDGE_FOCUS: ${{ inputs.focus }}
         run: |
-          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' judge-fixtures
+          $options = @()
+          if ($env:MYRK_CI_JUDGE_FOCUS -eq 'native') { $options += '--native-only' }
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' judge-fixtures @options
           exit $LASTEXITCODE
