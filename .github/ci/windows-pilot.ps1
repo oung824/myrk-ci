@@ -134,7 +134,10 @@ try {
 
     if ($Phase -eq 'install' -or $Check -eq 'office-com') {
         Write-CiSummary "### $Check"
-        Write-CiSummary 'Pilot on windows-2025. Selected offline checks only. Full backend and desktop behavior suites and Office document conversion are outside this run.'
+        Write-CiSummary 'Windows pilot scoped to selected offline checks.'
+        if ($env:RUNNER_ARCH -in @('X64', 'ARM64')) {
+            Write-CiSummary "- Runner architecture: $($env:RUNNER_ARCH)."
+        }
         if ($env:ImageVersion -match '^\d{4}(?:\.\d+){1,5}$') {
             Write-CiSummary "- Runner image version: $($env:ImageVersion)."
         }
