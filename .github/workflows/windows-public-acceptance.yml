@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       focus:
-        description: Run all groups or only the four additional groups
+        description: Scope of the synthetic acceptance run
         type: choice
-        options: [all, additional]
+        options: [all, additional, initial]
         default: all
 
 permissions:
@@ -23,6 +23,7 @@ jobs:
         group: >-
           ${{ fromJSON(inputs.focus == 'additional' &&
           '["synthetic-quality","synthetic-judge-qualification","synthetic-trust-and-memory","synthetic-review-and-cancellation"]' ||
+          inputs.focus == 'initial' && '["synthetic-acceptance"]' ||
           '["synthetic-acceptance","synthetic-quality","synthetic-judge-qualification","synthetic-trust-and-memory","synthetic-review-and-cancellation"]') }}
     defaults:
       run:

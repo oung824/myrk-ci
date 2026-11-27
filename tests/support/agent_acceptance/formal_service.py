@@ -22,7 +22,6 @@ from tests.support.agent_acceptance.core import SharedControlError
 from tests.support.agent_acceptance.preparation import CaseBudgetExceeded, LiveGate
 from tests.support.agent_acceptance.replay import OfflineSession, Reply, SDKCapture, active_sdk_input, active_judge_call
 from tests.support.agent_acceptance.formal import verify_authority
-from tests.support.agent_acceptance.formal_adoption import adoption_mock
 from tests.support.agent_acceptance.save_diagnostics import observe_saves
 from tests.support.agent_acceptance.recorded_response import RecordedResponseStream, capture_response_metadata
 from tests.support.process_receipt import write_process_receipt
@@ -212,7 +211,11 @@ async def main() -> None:
     terminal_mock = OfflineSession(value.protocol, replies, config=value.provider_config)
     from tests.support.agent_acceptance.compaction_continuity import FORMAL_CASES as CONTINUITY_CASES, ContinuityMock
     continuity = ContinuityMock(value.case_id,value.protocol,value.provider_config) if value.case_id in CONTINUITY_CASES and grant.transport == "mock" else None
-    adoption = adoption_mock(value.case_id, value.protocol, config=value.provider_config) if grant.transport == "mock" and continuity is None else None
+    adoption = None
+    if grant.transport == "mock" and continuity is None:
+        from tests.support.agent_acceptance.formal_adoption import adoption_mock
+
+        adoption = adoption_mock(value.case_id, value.protocol, config=value.provider_config)
     directory.mkdir(parents=True, exist_ok=True)
     if value.case_id != "desktop.handoff":
         from tests.support.agent_acceptance.formal_scenarios import manifest
