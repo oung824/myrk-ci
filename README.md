@@ -6,6 +6,8 @@
 
 **Windows public offline backend** 将 27 份已选后端测试文件分到六台托管机，并比对发现和实际执行的用例身份。需要真实文件访问限制的布局测试使用 Windows 11 ARM。**Windows 11 ARM executor probe** 用同一固定执行器探测该环境的系统访问限制能力。
 
+**Windows public offline backend remainder** 将其余 45 份顶层后端测试文件分配给 13 台 Windows 托管机，按文件报告通过、失败和回收结果。
+
 **Windows public offline judge** 验证 130 项本地合成账本和两次固定回复的 SDK 调用。试跑用空历史索引生成本轮报告，历史原件专项在本机运行。
 
 试跑范围以工作流列出的用例为准。完整验收还需要独立覆盖全部后端和桌面用例，并用装有桌面 Office 的受控 Windows 环境验证文档预览。包含本机验收记录的历史资料留在原项目内。公开工作流的执行日志应只保留试跑范围、耗时和状态。

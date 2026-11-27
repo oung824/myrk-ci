@@ -35,6 +35,33 @@ GROUPS = {
     ),
     'layout-context': ('test_layout_context',),
     'judge-fixtures': ('acceptance/test_judge_full_ledger', 'acceptance/test_judge_native_roundtrip'),
+    'process-and-scheduling': ('test_parallel_checks', 'test_process_observation'),
+    'root-git-hooks': ('test_closeout_file_lists', 'test_pre_commit', 'test_pre_commit_size'),
+    'executor-and-network': (
+        'test_action_reporting_facts', 'test_execution_identity', 'test_executor',
+        'test_full_network', 'test_supervisor_origin',
+    ),
+    'serial-checks': ('test_check_commands_serial',),
+    'action-approval': (
+        'test_approval_instruction_contract', 'test_approval_modes', 'test_auto_review',
+        'test_extension_review',
+    ),
+    'artifact-delivery': (
+        'test_artifacts', 'test_extensions', 'test_formal_delivery_scoring', 'test_independent_delivery',
+    ),
+    'conversation-and-delegation': (
+        'test_context', 'test_conversation', 'test_delegation', 'test_delegation_verification_status',
+        'test_independent_conversation', 'test_task_goal_context',
+    ),
+    'desktop-conversation': ('test_desktop_service', 'test_live_settings', 'test_window'),
+    'recovery': ('test_compaction_recovery', 'test_recovery', 'test_recovery_ownership', 'test_step_window_recovery'),
+    'retained-context': ('test_compaction_protocols', 'test_memory', 'test_persistent_layout', 'test_project_context'),
+    'provider-transcripts': ('test_deepseek_protocol', 'test_gemini_observation', 'test_gemini_tools_and_resume'),
+    'request-protocols': ('test_request_contracts', 'test_request_observation'),
+    'review-evidence': (
+        'test_independent_review', 'test_review_format_compatibility', 'test_review_tool_recovery',
+        'test_review_tool_recovery_http',
+    ),
 }
 PHASES = {'setup', 'call', 'teardown'}
 RESULTS = ROOT / '.scratch/check-runs/results'

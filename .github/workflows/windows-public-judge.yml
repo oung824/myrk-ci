@@ -18,10 +18,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install locked Python dependencies
+      - name: Install locked Python dependencies and verify the fixed executor
         run: >-
           & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
-          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-public
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
       - name: Prepare the synthetic report index
         run: |
           $index = 'tests/acceptance/materials/history/index.json'

@@ -1,0 +1,49 @@
+name: Windows public offline backend expansion
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend ${{ matrix.group }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: process-and-scheduling, runner: windows-2025, installer: backend-public}
+          - {group: root-git-hooks, runner: windows-2025, installer: backend-public}
+          - {group: executor-and-network, runner: windows-11-arm, installer: backend-executor}
+          - {group: serial-checks, runner: windows-11-arm, installer: backend-executor}
+          - {group: action-approval, runner: windows-11-arm, installer: backend-executor}
+          - {group: artifact-delivery, runner: windows-11-arm, installer: backend-executor}
+          - {group: conversation-and-delegation, runner: windows-11-arm, installer: backend-executor}
+          - {group: desktop-conversation, runner: windows-11-arm, installer: backend-executor}
+          - {group: recovery, runner: windows-11-arm, installer: backend-executor}
+          - {group: retained-context, runner: windows-11-arm, installer: backend-executor}
+          - {group: provider-transcripts, runner: windows-11-arm, installer: backend-executor}
+          - {group: request-protocols, runner: windows-11-arm, installer: backend-executor}
+          - {group: review-evidence, runner: windows-11-arm, installer: backend-executor}
+    env:
+      MYRK_CI_GROUP: ${{ matrix.group }}
+      MYRK_CI_INSTALLER: ${{ matrix.installer }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check $env:MYRK_CI_INSTALLER
+      - name: Collect and run the selected offline tests
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_GROUP
+          exit $LASTEXITCODE

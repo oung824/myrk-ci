@@ -1,0 +1,45 @@
+# Dependency lockfiles and generated source files
+**/*.lock
+**/package-lock.json
+**/npm-shrinkwrap.json
+**/pnpm-lock.yaml
+**/bun.lockb
+**/*.generated.*
+**/*.gen.*
+**/generated/**
+
+# Local snapshot and check outputs
+.scratch/**/baseline.json
+.scratch/**/baseline-attempt.json
+.scratch/**/baseline-derived-*.json
+.scratch/**/baseline-mid-implementation.json
+.scratch/**/frontend-supplementary-baseline.json
+.scratch/**/integration-baseline.json
+.scratch/**/repair-baseline.json
+.scratch/**/spec-baseline.json
+.scratch/**/tickets-baseline.json
+.scratch/**/worktree-baseline.json
+.scratch/check-runs/results/b-*.json
+.scratch/check-runs/results/b-*.stdout.txt
+.scratch/check-runs/results/b-*.stderr.txt
+.scratch/check-runs/results/b-*.reports/**
+.scratch/check-runs/results/desktop-run-*.json
+.scratch/check-runs/results/desktop-run-*-reports/**
+.scratch/check-runs/results/p-*.json
+.scratch/check-runs/results/p-*.failure.txt
+.scratch/check-runs/results/p-*.reports/**
+.scratch/check-runs/results/parallel-*.json
+
+# Imported references and test fixtures
+AI-Agents-in-Depth-zh-CN.pdf
+myrk/vendor/CODEX_LICENSE
+myrk/vendor/CODEX_NOTICE
+myrk/vendor/HERMES_LICENSE
+myrk/vendor/hermes_threat_patterns.py
+desktop/scripts/office-preview-fixtures/*.docx
+desktop/scripts/office-preview-fixtures/*.pdf
+desktop/scripts/office-preview-fixtures/*.pptx
+desktop/scripts/office-preview-fixtures/*.xlsx
+tests/acceptance/materials/**/*.zip
+tests/acceptance/materials/queue-parallel/actual-*.json
+tests/fixtures/request_contracts/core-tools-v[12].json
