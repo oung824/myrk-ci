@@ -6,7 +6,7 @@ on:
       focus:
         description: Run both synthetic checks or diagnose only the native SDK case
         type: choice
-        options: [all, native, synthetic-artifacts]
+        options: [all, native, synthetic-artifacts, quality-recovery]
         default: all
 
 permissions:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   judge:
-    if: inputs.focus != 'synthetic-artifacts'
+    if: inputs.focus == 'all' || inputs.focus == 'native'
     runs-on: windows-11-arm
     timeout-minutes: 15
     defaults:
@@ -93,4 +93,43 @@ jobs:
           sys.exit(backend["main"]())
           '@
           $verify | & '.venv/Scripts/python.exe' -B -
+          exit $LASTEXITCODE
+
+  quality-recovery:
+    name: Verify ${{ matrix.group }}
+    if: inputs.focus == 'quality-recovery'
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: recovery-controls, count: '21', digest: '38d809592c198800dab7e2c5a3bd1e86bbb0abae859c1688787d9274b81621bf'}
+          - {group: resume-controls, count: '20', digest: 'f207091bb40640a5a2a8aed4b28fd4976c33535d65126eaff4df1fc2464182f7'}
+          - {group: terminal-projection, count: '1', digest: 'b48f02ccb6690f0125b7676c874fd9c7cd6afea3e9542eb34165bd3863f63dfd'}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Prepare the synthetic report index
+        run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+      - name: Run the selected synthetic tests
+        env:
+          MYRK_GROUP: ${{ matrix.group }}
+          MYRK_COUNT: ${{ matrix.count }}
+          MYRK_DIGEST: ${{ matrix.digest }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-quality-recovery.py' $env:MYRK_GROUP $env:MYRK_COUNT $env:MYRK_DIGEST
           exit $LASTEXITCODE
