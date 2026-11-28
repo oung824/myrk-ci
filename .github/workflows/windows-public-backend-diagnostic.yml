@@ -6,7 +6,7 @@ on:
       focus:
         description: Run the four reproduced cases, full files, or integrated runner checks
         type: choice
-        options: [cases, files, integrated, artifact, auxiliary, file-behavior, isolated-formal, source-only-controls, synthetic-material-parity, registry-parity]
+        options: [cases, files, integrated, artifact, auxiliary, file-behavior, isolated-formal, source-only-controls, synthetic-material-parity, synthetic-child-rows, registry-parity]
         default: cases
 
 permissions:
@@ -294,13 +294,13 @@ jobs:
 
   synthetic-material-parity:
     name: Synthetic material parity ${{ matrix.group }}
-    if: inputs.focus == 'synthetic-material-parity'
+    if: inputs.focus == 'synthetic-material-parity' || inputs.focus == 'synthetic-child-rows'
     runs-on: windows-11-arm
     timeout-minutes: 12
     strategy:
       fail-fast: false
       matrix:
-        group: [governance-refusal, governance-action-identity, governance-measurement-limit, governance-child-rows, memory-save-rejection]
+        group: ${{ fromJSON(inputs.focus == 'synthetic-child-rows' && '["governance-child-rows"]' || '["governance-refusal","governance-action-identity","governance-measurement-limit","governance-child-rows","memory-save-rejection"]') }}
     defaults:
       run:
         shell: pwsh

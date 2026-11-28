@@ -25,7 +25,7 @@ GOVERNANCE_MATERIALS = {
     }),
     "governance-child-rows": ("QG3.formal.6", {
         "goal": "Verify the generated child ledger and write the checked sum.",
-        "parameters": {"parent_target": "inventory.txt"},
+        "parameters": {"child_root": "child", "parent_target": "inventory.txt"},
         "sources": {"child/ledger.txt": {"text": "Generated ledger. The assertion replaces its contents.\n"}},
         "gold": {},
     }),
