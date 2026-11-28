@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory)]
     [ValidateSet('electron-workflows', 'python-service', 'renderer-and-state', 'pdf-and-programming',
-        'diagnose-index', 'diagnose-lifecycle', 'diagnose-exit-acceptance', 'diagnose-recovery', 'diagnose-approval-modes')]
+        'diagnose-index', 'diagnose-lifecycle', 'diagnose-exit-acceptance', 'diagnose-recovery', 'diagnose-approval-modes', 'electron-remainder')]
     [string]$Group
 )
 
@@ -106,6 +106,29 @@ $focusedDiagnostics = @{
     }
 }
 
+$electronRemainder = @(
+    @{
+        file = 'src/main/connection-persistence.test.ts'
+        cases = @('the real desktop saves, fully restarts, restores and forgets a local credential')
+        sources = @('desktop/tests/connection-persistence.electron.mjs', 'desktop/tests/desktop-process.ts')
+    }
+    @{
+        file = 'src/main/connection-profile-context.test.ts'
+        cases = @('the formal owner restores a connection saved in its original encryption context')
+        sources = @('desktop/tests/connection-profile-context.electron.mjs', 'desktop/tests/desktop-process.ts')
+    }
+    @{
+        file = 'src/main/connection-store.integration.test.ts'
+        cases = @('real Electron encryption restores saved connections after full process exit')
+        sources = @('desktop/tests/connection-store.electron.mjs', 'desktop/tests/desktop-process.ts')
+    }
+    @{
+        file = 'src/main/image-preview-electron.test.ts'
+        cases = @('the real desktop opens delivered PNG, JPEG, GIF and WebP images from fixed bytes')
+        sources = @('desktop/tests/image-preview.electron.mjs', 'desktop/tests/desktop-process.ts', 'tests/document_preview_fixture.py')
+    }
+)
+
 function Write-DesktopDiagnostic($Diagnostic, $Module, [string]$Root) {
     $publishedTest = "desktop/$($Diagnostic.file)"
     $lineLimits = @{}
@@ -171,8 +194,13 @@ try {
     if (($inventory -join "`n") -cne (($assigned | Sort-Object) -join "`n")) {
         throw 'Desktop file assignments differ from the test inventory.'
     }
-    $diagnostic = $diagnosticGroups[$Group] ?? $focusedDiagnostics[$Group]
-    $selected = if ($diagnostic) { @($diagnostic.file) } else { $groups[$Group] }
+    $diagnostics = if ($Group -eq 'electron-remainder') {
+        $electronRemainder
+    } else {
+        $diagnosticGroups[$Group] ?? $focusedDiagnostics[$Group]
+    }
+    $diagnostics = @($diagnostics | Where-Object { $_ })
+    $selected = if ($diagnostics.Count) { @($diagnostics.file) } else { $groups[$Group] }
     $selected = @($selected)
     $arguments = $selected
     $filteredSerial = $Group -eq 'pdf-and-programming'
@@ -180,7 +208,7 @@ try {
         $namePattern = '^(?:' + ($publicSerialCases -join '|') + ')$'
         $arguments += @('--testNamePattern', $namePattern)
     }
-    if ($diagnostic) {
+    if ($diagnostics.Count) {
         $arguments += @('--reporter', 'json', '--includeTaskLocation')
     }
     Write-CiSummary "- Selected Vitest files: $($selected.Count)."
@@ -233,18 +261,24 @@ try {
     Write-CiSummary "- Temporary configuration removed: $configurationRemoved. Protected generated locations unchanged: $protectedUnchanged."
 
     $diagnosticVerified = $true
-    if ($diagnostic) {
+    if ($diagnostics.Count) {
         $diagnosticVerified = $false
         $diagnosticReport = Join-Path $results "$($receipts[0].BaseName)-reports" 'json/output.json'
         if ($diagnosticReport -iin @($receipt.reports) -and (Test-Path -LiteralPath $diagnosticReport -PathType Leaf)) {
             $report = Get-Content -LiteralPath $diagnosticReport -Raw | ConvertFrom-Json
             $modules = @($report.testResults)
-            $expectedModule = Join-Path $desktop $diagnostic.file
-            if ($modules.Count -eq 1 -and ([string]$modules[0].name).Replace('/', '\') -ieq $expectedModule) {
-                $module = $modules[0]
+            $diagnosticVerified = $modules.Count -eq $diagnostics.Count
+            foreach ($diagnostic in $diagnostics) {
+                $expectedModule = Join-Path $desktop $diagnostic.file
+                $matchingModules = @($modules | Where-Object { ([string]$_.name).Replace('/', '\') -ieq $expectedModule })
+                if ($matchingModules.Count -ne 1) {
+                    $diagnosticVerified = $false
+                    continue
+                }
+                $module = $matchingModules[0]
                 $actualCases = ($module.assertionResults.title | Sort-Object) -join "`n"
                 $expectedCases = ($diagnostic.cases | Sort-Object) -join "`n"
-                $diagnosticVerified = $actualCases -ceq $expectedCases
+                $diagnosticVerified = $diagnosticVerified -and $actualCases -ceq $expectedCases
                 Write-DesktopDiagnostic $diagnostic $module $root
             }
         }
