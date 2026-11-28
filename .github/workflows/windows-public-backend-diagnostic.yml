@@ -6,7 +6,7 @@ on:
       focus:
         description: Run the four reproduced cases, full files, or integrated runner checks
         type: choice
-        options: [cases, files, integrated]
+        options: [cases, files, integrated, artifact]
         default: cases
 
 permissions:
@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   diagnosis:
+    if: inputs.focus != 'artifact'
     name: Diagnose ${{ matrix.name }}
     runs-on: windows-11-arm
     timeout-minutes: 12
@@ -89,4 +90,40 @@ jobs:
           MYRK_RUNNER_SCOPE: ${{ matrix.scope }}
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' "integrated-runner-$env:MYRK_RUNNER_SCOPE"
+          exit $LASTEXITCODE
+
+  artifact:
+    name: Verify artifact delivery on native Windows
+    if: inputs.focus == 'artifact'
+    runs-on: windows-2025
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Run the selected file and report safe failure locations
+        run: |
+          $diagnose = @'
+          import runpy
+          import sys
+
+          path = ".github/ci/windows-public-backend.py"
+          driver = runpy.run_path(path)
+          driver["DIAGNOSTIC_FILES"]["test_artifacts"] = "artifact-delivery"
+          sys.argv = [
+              path, "artifact-delivery", "--diagnostic-file", "test_artifacts",
+              "--expected-count", "24",
+              "--expected-node-digest", "bbb187bc32cfa39424c45c039322fff1c4e2b17b220e3f1f79b6d393340449e1",
+          ]
+          sys.exit(driver["main"]())
+          '@
+          $diagnose | & '.venv/Scripts/python.exe' -B -
           exit $LASTEXITCODE
