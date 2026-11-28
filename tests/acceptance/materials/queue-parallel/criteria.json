@@ -1,0 +1,60 @@
+{
+  "version": "queue-parallel-v2",
+  "dimensions": {
+    "supplement_source": "Each received supplement retains its actual source ID and is applied once at its recorded native request. Unadopted material grants no instruction.",
+    "queue_order": "Actual starts match the saved queue in order; partial failure never changes the following goal, scope or approval.",
+    "parallel_isolation": "One real Main owns different conversation records and Task IDs; native inputs, actions, approval and actual local recipients remain separate.",
+    "stop_effect": "An accepted per-task stop forbids new sends and actions for that task and its child/review scope; existing partial effects and unresolved cost remain recorded.",
+    "honest_state": "Saved, started, applied, sent and stopped states have corresponding public and original evidence.",
+    "content_review": "Fixed model replies measure program facts only; named human review and user acceptance remain separate."
+  },
+  "frozen_events": {
+    "D14": [
+      "native original held",
+      "one public supplement received",
+      "two independent goals queued",
+      "release original",
+      "supplement applied once",
+      "original finishes",
+      "queue first partly fails",
+      "queue second starts unchanged"
+    ],
+    "D15": [
+      "A actual partial effect",
+      "A native text fragment held",
+      "B native request held",
+      "A stop accepted",
+      "B continues exact own work",
+      "B stop accepted"
+    ]
+  },
+  "unsupported_public_contracts": {
+    "duplicate_delivery_id": "unknown: public Send has no caller delivery identity",
+    "individual_supplement_cancellation": "unknown: no public cancellation command"
+  },
+  "human_review": "not_performed",
+  "semantics": "not_measured",
+  "user_acceptance": "pending",
+  "dimension_applicability": {
+    "formal.queue-supplement": {
+      "parallel_isolation": {
+        "applicable": false,
+        "reason": "Predeclared D14/G03 uses one conversation with sequential queued tasks."
+      },
+      "stop_effect": {
+        "applicable": false,
+        "reason": "Predeclared D14/G03 has no stop event; actual stop controls are separate executions."
+      }
+    },
+    "formal.parallel-stop": {
+      "supplement_source": {
+        "applicable": false,
+        "reason": "Predeclared D15 sends no supplemental instruction."
+      },
+      "queue_order": {
+        "applicable": false,
+        "reason": "Predeclared D15 uses independent parallel conversations, no queued tasks."
+      }
+    }
+  }
+}

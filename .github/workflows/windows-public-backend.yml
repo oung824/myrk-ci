@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the public backend run
         type: choice
-        options: [standard, frozen-synthetic, frozen-history-retry, retained-synthetic]
+        options: [standard, frozen-synthetic, frozen-history-retry, retained-synthetic, retained-materials]
         default: standard
 
 permissions:
@@ -50,14 +50,16 @@ jobs:
 
   frozen-synthetic:
     name: Frozen synthetic / ${{ matrix.group }}
-    if: inputs.focus == 'frozen-synthetic' || inputs.focus == 'frozen-history-retry' || inputs.focus == 'retained-synthetic'
+    if: inputs.focus == 'frozen-synthetic' || inputs.focus == 'frozen-history-retry' || inputs.focus == 'retained-synthetic' || inputs.focus == 'retained-materials'
     runs-on: windows-11-arm
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include: >-
-          ${{ fromJSON(inputs.focus == 'retained-synthetic' &&
+          ${{ fromJSON(inputs.focus == 'retained-materials' &&
+          '[{"group":"retained-native-compaction","count":"1","digest":"d608f305c7d4dfcc8a22f55fc9d64055415810f1c6566dad9083e3d2f324c185","index_alias":false,"sampler":false},{"group":"retained-role-cost","count":"3","digest":"09d65cefe9b46b6c9df0c4724c1e5722a372c8027bde0c8c9fd04e72f88818b1","index_alias":false,"sampler":false},{"group":"retained-judge-criteria","count":"4","digest":"185b032dc60205a7b92e467d4b6e4e3bdbde5ed3bea527867952a2f10b403a02","index_alias":false,"sampler":false},{"group":"retained-synthetic-queue","count":"5","digest":"a28167aabc6a358e51fa2715237fe01cef83594eb767d976e4712ff0e091ecdd","index_alias":false,"sampler":false},{"group":"retained-legacy-ledger","count":"1","digest":"9803c65b43a33b5eec96888d7ede6448b1f253c9bf98ce920ec2435d85611b9a","index_alias":false,"sampler":false},{"group":"retained-criteria-refreeze","count":"1","digest":"3427919f9faf77d8ed181a7013bdc6ff4bc4b85bc3ee417cc72a252f08fc37f6","index_alias":true,"sampler":false}]' ||
+          inputs.focus == 'retained-synthetic' &&
           '[{"group":"retained-judge-provenance","count":"6","digest":"98014ada90b5b0b648c326d30f2c23795232e036c9d4fbd2d7a0565fd9fab1ac","index_alias":true,"sampler":true},{"group":"retained-report-controls","count":"3","digest":"04e9eeaf7d653cd9b53948a5add7164d6371787848f87fcd53ac61e673fcadce","index_alias":false,"sampler":false}]' ||
           format('[{0}{1}]',
           '{"group":"frozen-bindings","count":"22","digest":"34bab8de1c5edddac567d431e64b6adc874b8bb71a9cb7b4485d075f36060a29","index_alias":true,"sampler":false},{"group":"frozen-budget","count":"13","digest":"2cec51a308820e8aaca1ea99d36e15c4bf5f59d8740b02411cac8794e957b61e","index_alias":true,"sampler":false},{"group":"frozen-controls","count":"7","digest":"9f4a1d7a83bc7316d1622ff3563b4c81e95bd079f68e6802ebbb5fa7ed6b882e","index_alias":true,"sampler":false},{"group":"frozen-candidate-compatibility","count":"2","digest":"c1a686ba27e7f05a8c03414a87cd6630ef89074b52edb331172c39dae2618500","index_alias":false,"sampler":false},{"group":"frozen-candidate-cancellation","count":"1","digest":"461b5dc9604eca266f3844c49bb95aba41190128ef6dca29929e18bc5ccafa77","index_alias":false,"sampler":false},{"group":"judge-sampling","count":"10","digest":"623fd2b8f67da281b3efcb0b0310cd9a5c58575d000a6ef20bc4246a614be230","index_alias":true,"sampler":true},{"group":"judge-native-guards","count":"7","digest":"ba40091f8264a0a7e31ca6221e7a5f89938b542fc7421c4e56e684446a7c92e3","index_alias":true,"sampler":false}',

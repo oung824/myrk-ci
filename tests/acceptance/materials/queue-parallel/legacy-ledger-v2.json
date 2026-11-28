@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "authorization": null,
+  "binding": "legacy-product-stop-binding",
+  "authorization_binding": null,
+  "stopped": false,
+  "stop_reason": null,
+  "case_stops": {
+    "legacy.stopped:deepseek": {
+      "reason": "old stop is permanent",
+      "unfinished": "No replacement allowance."
+    }
+  },
+  "attempts": [],
+  "execution_results": {},
+  "phase_microusd": {},
+  "reserve_microusd": 0,
+  "transfers": [],
+  "scope_stops": [],
+  "integrity": "d8375bd4f79cbd62bb312339a6b604fd56deb96476ec5748d59ac8e44f3ebbe7"
+}

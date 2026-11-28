@@ -1,0 +1,29 @@
+{
+  "retained-native-compaction": [
+    "tests/acceptance/test_compaction_source_continuity.py::test_real_summary_save_obstruction_preserves_durable_chat_and_sends_no_work"
+  ],
+  "retained-role-cost": [
+    "tests/acceptance/test_request_cost_gate.py::test_all_product_roles_and_retry_steps_spend_the_same_execution_grant[compaction.short-expected2]",
+    "tests/acceptance/test_request_cost_gate.py::test_all_product_roles_and_retry_steps_spend_the_same_execution_grant[delegation.review-retry-expected0]",
+    "tests/acceptance/test_request_cost_gate.py::test_all_product_roles_and_retry_steps_spend_the_same_execution_grant[memory.review-add-expected1]"
+  ],
+  "retained-judge-criteria": [
+    "tests/acceptance/test_judge_human_reference.py::test_bound_source_critical_dimension_cannot_become_an_ordinary_judge_reference[critical_dimensions]",
+    "tests/acceptance/test_judge_human_reference.py::test_bound_source_critical_dimension_cannot_become_an_ordinary_judge_reference[critical_flag]",
+    "tests/acceptance/test_judge_human_reference.py::test_bound_source_critical_dimension_cannot_become_an_ordinary_judge_reference[mandatory_human]",
+    "tests/acceptance/test_judge_human_reference.py::test_bound_source_ordinary_dimension_stays_available_to_the_judge"
+  ],
+  "retained-synthetic-queue": [
+    "tests/acceptance/test_queue_parallel_stop.py::test_partial_service_failure_keeps_raw_error_and_next_queued_goal_unchanged",
+    "tests/acceptance/test_queue_parallel_stop.py::test_stopped_pending_supplement_stays_unapplied_and_saved_queue_needs_explicit_start",
+    "tests/acceptance/test_queue_parallel_stop.py::test_stream_failure_retains_received_fragment_and_never_counts_as_correct_stop",
+    "tests/acceptance/test_review_contract_triggers.py::test_actual_saved_queue_open_keeps_its_base_and_recovery_contracts[queue.partial-stream-error]",
+    "tests/acceptance/test_review_contract_triggers.py::test_actual_saved_queue_open_keeps_its_base_and_recovery_contracts[queue.supplement-stopped-saved]"
+  ],
+  "retained-legacy-ledger": [
+    "tests/acceptance/test_queue_parallel_stop.py::test_old_v2_original_integrity_and_stop_survive_read_only_compatibility"
+  ],
+  "retained-criteria-refreeze": [
+    "tests/acceptance/test_candidate_refreeze_compatibility.py::test_reviewed_new_criteria_packet_preserves_tasks_and_parent"
+  ]
+}

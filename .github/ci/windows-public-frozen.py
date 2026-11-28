@@ -1,5 +1,6 @@
 """Select frozen synthetic cases through the audited backend driver."""
 
+import json
 from pathlib import Path
 import runpy
 import sys
@@ -59,8 +60,7 @@ RETAINED_SELECTION = {
 }
 
 
-def run_retained(backend, driver, group):
-    nodes = tuple(f"tests/acceptance/{node}" for node in RETAINED_SELECTION[group])
+def run_retained(backend, driver, group, nodes):
     files = tuple(dict.fromkeys(node.partition("::")[0].removeprefix("tests/").removesuffix(".py") for node in nodes))
     backend["AUDITED_GROUPS"][group] = files
     backend["AUDITED_SELECTION"][group] = nodes
@@ -88,7 +88,11 @@ def main():
     backend = runpy.run_path(str(driver))
     sys.argv = [str(driver), group, "--expected-count", count, "--expected-node-digest", digest]
     if group in RETAINED_SELECTION:
-        return run_retained(backend, driver, group)
+        nodes = tuple(f"tests/acceptance/{node}" for node in RETAINED_SELECTION[group])
+        return run_retained(backend, driver, group, nodes)
+    if group.startswith("retained-"):
+        selection = json.loads(driver.with_name("windows-public-retained-material-selection.json").read_bytes())
+        return run_retained(backend, driver, group, tuple(selection[group]))
     filename, selected, excluded = GROUPS[group]
     backend["AUDITED_GROUPS"][group] = (f"acceptance/{filename}",)
     prefix = f"tests/acceptance/{filename}.py::"
