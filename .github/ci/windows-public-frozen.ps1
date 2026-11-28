@@ -82,7 +82,9 @@ try {
         $env:MYRK_JUDGE_SAMPLING_PYTHON = Join-Path $sampler 'python.exe'
         & $env:MYRK_JUDGE_SAMPLING_PYTHON -I -S -B -c 'import sys; sys.exit(sys.implementation.name != "cpython" or sys.version_info[:3] != (3, 13, 0))'
         if ($LASTEXITCODE -ne 0) { throw 'The sampler did not start as CPython 3.13.0.' }
-        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value '- Verified the pinned CPython 3.13.0 sampler archive and runtime.'
+        $samplerProof = '- Verified the pinned CPython 3.13.0 sampler archive and runtime.'
+        Write-Output $samplerProof
+        Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $samplerProof
     }
 
     & $python -B (Join-Path $PSScriptRoot 'windows-public-frozen.py') $Group $NodeCount $NodeDigest
@@ -118,6 +120,8 @@ finally {
         throw 'The disposable helper directory changed before cleanup.'
     }
     Remove-Item -LiteralPath $runtime -Recurse -Force
-    Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value '- Removed the job-owned compatibility mount and sampler files.'
+    $cleanupProof = '- Removed the job-owned compatibility mount and sampler files.'
+    Write-Output $cleanupProof
+    Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $cleanupProof
 }
 exit $exitCode
