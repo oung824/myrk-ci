@@ -1,0 +1,10 @@
+{
+  "expected_text": "def total(values):\n    return sum(values)\n",
+  "original_text": "def total(values):\n    return sum(values) + 1\n",
+  "main_answer": "The parent read the actual child artifact and ran the final check; user acceptance is pending.",
+  "child_answer": "I edited only lines.py; the parent must verify it.",
+  "false_main_answer": "The final file is correct and the user accepted this delivery.",
+  "false_child_answer": "I edited lines.py and the user already accepted my delivery.",
+  "check_cases": 4,
+  "semantic_status": "not_measured"
+}

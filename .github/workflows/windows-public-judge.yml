@@ -6,7 +6,7 @@ on:
       focus:
         description: Run both synthetic checks or diagnose only the native SDK case
         type: choice
-        options: [all, native]
+        options: [all, native, synthetic-artifacts]
         default: all
 
 permissions:
@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   judge:
+    if: inputs.focus != 'synthetic-artifacts'
     runs-on: windows-11-arm
     timeout-minutes: 15
     defaults:
@@ -41,4 +42,55 @@ jobs:
           $options = @()
           if ($env:MYRK_CI_JUDGE_FOCUS -eq 'native') { $options += '--native-only' }
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' judge-fixtures @options
+          exit $LASTEXITCODE
+
+  synthetic-artifacts:
+    name: Acceptance ${{ matrix.group }} materials
+    if: inputs.focus == 'synthetic-artifacts'
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: audited-compaction-fixtures, count: '21', digest: '9b0bd754f6d2b08f746e58ddaf0e57ea83d66cf9b21a0c2429ae2811fe1dc9ef'}
+          - {group: audited-delegation-fixtures, count: '9', digest: 'afec2f4f3b2fabc4ea3c2d7593ab8f2e3858b95e9ad63af1a54814181d49eb10'}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Prepare the synthetic report index
+        run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+      - name: Verify the complete synthetic materials
+        env:
+          MYRK_GROUP: ${{ matrix.group }}
+          MYRK_COUNT: ${{ matrix.count }}
+          MYRK_DIGEST: ${{ matrix.digest }}
+        run: |
+          $verify = @'
+          import os
+          import runpy
+          import sys
+
+          driver = ".github/ci/windows-public-backend.py"
+          scope = os.environ["MYRK_GROUP"]
+          backend = runpy.run_path(driver)
+          backend["AUDITED_SELECTION"][scope] = backend["AUDITED_DESELECT"].pop(scope)
+          sys.argv = [driver, scope, "--expected-count", os.environ["MYRK_COUNT"],
+                      "--expected-node-digest", os.environ["MYRK_DIGEST"]]
+          sys.exit(backend["main"]())
+          '@
+          $verify | & '.venv/Scripts/python.exe' -B -
           exit $LASTEXITCODE
