@@ -27,6 +27,7 @@ from myrk._conversation.records import (
     without_pending_supplement_journal as without_pending_supplement_journal,
 )
 from myrk.actions import Action as Action
+from myrk.checks import prepare_check_runtime
 from myrk.context import CORE_TOOL_CONTRACT_VERSION
 from myrk.extensions import ExtensionCatalog
 from myrk.memory import MemoryChange
@@ -40,6 +41,7 @@ from myrk.task_control import RequestAttempt as RequestAttempt, TaskBudget, Work
 
 class Conversation:
     def __init__(self, path: Path, *, approval_settings: ApprovalSettings | None = None) -> None:
+        prepare_check_runtime()
         self.path = path
         self._record = ConversationRecord(version=10, messages=[], turns=[], approval_settings=approval_settings.model_copy(deep=True) if approval_settings is not None else None)
         self._resume_authorized: str | None = None

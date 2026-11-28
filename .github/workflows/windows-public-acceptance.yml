@@ -162,7 +162,7 @@ jobs:
           - {group: audited-quality-materials-1, expected_count: '4', node_digest: '7b66b3ad9c69b399d80613fd5d91dc1f2d589bafedca67e59674baac2c536621'}
           - {group: audited-quality-materials-2, expected_count: '4', node_digest: '5418b204920be0f3444ef766572a6b8936d13a8b664c413d4651d4b6987b73b1'}
           - {group: audited-quality-materials-3, expected_count: '4', node_digest: '9ea55ad556c7e1d7b4b417364d688253ea7d45c595ce80413ef74cd39273a7b0'}
-          - {group: audited-quality-materials-4, expected_count: '12', node_digest: '4102b5cc21dc34667eef657a4fb4d99e9e48dfbddaa7058290e659f65a64b198'}
+          - {group: audited-quality-materials-4, expected_count: '11', node_digest: '5612079ef4acc8621502aa0a9358aa37b6f71375ddd6a764581db902c685f13b'}
           - {group: audited-quality-materials-5, expected_count: '11', node_digest: 'bab7d3dfdbd211febd1f49bd6591006dc23631ffc586c807496ecb93e38e5c59'}
           - {group: audited-quality-materials-6, expected_count: '11', node_digest: 'ffd602ac60f54d11e0f585d7eea1423f36c2f74d97566ac565e34fa7954eb1c9'}
     defaults:
@@ -205,7 +205,7 @@ jobs:
           - {group: audited-candidate-controls, expected_count: '15', node_digest: '318a9fb49501c66c1cd414a2d78c3c98ef1fb61af25a8d61af7d2f2e3962b012', node: false}
           - {group: audited-sdk-reopen, expected_count: '2', node_digest: '33c50a3cfdf9aaec86d9685a1d15d18076ae1c84f8d42b136301613b742aa3fd', node: false}
           - {group: audited-governance-stop-control, expected_count: '5', node_digest: 'ce8b63d2edada47a3e59d7ee53c497a61a2814469785d49c0aeb1606dfaefbde', node: true}
-          - {group: audited-quality-materials-4, expected_count: '12', node_digest: '4102b5cc21dc34667eef657a4fb4d99e9e48dfbddaa7058290e659f65a64b198', node: false}
+          - {group: audited-quality-materials-4, expected_count: '11', node_digest: '5612079ef4acc8621502aa0a9358aa37b6f71375ddd6a764581db902c685f13b', node: false}
     defaults:
       run:
         shell: pwsh

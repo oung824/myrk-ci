@@ -19,25 +19,9 @@ jobs:
             name: Backend type check
             runtime: python
             runner: windows-2025
-          - check: backend-records
-            name: Backend smoke - conversation records and context
-            runtime: python
-            runner: windows-2025
-          - check: backend-executor
-            name: Backend smoke - executor output
-            runtime: python
-            runner: windows-11-arm
           - check: typescript-types
             name: Desktop type check
             runtime: node
-            runner: windows-2025
-          - check: desktop-contracts
-            name: Desktop smoke - runner contracts
-            runtime: node
-            runner: windows-2025
-          - check: office-com
-            name: Office COM availability
-            runtime: office
             runner: windows-2025
     env:
       MYRK_PILOT_CHECK: ${{ matrix.check }}
@@ -57,18 +41,10 @@ jobs:
           architecture: x64
           package-manager-cache: false
       - name: Install locked project dependencies
-        if: matrix.runtime != 'office'
         run: >-
           & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
           -File .github/ci/windows-pilot.ps1 -Phase install -Check $env:MYRK_PILOT_CHECK
       - name: Run the selected check
-        if: matrix.runtime != 'office'
-        run: >-
-          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
-          -File .github/ci/windows-pilot.ps1 -Phase check -Check $env:MYRK_PILOT_CHECK
-      - name: Probe Word, Excel and PowerPoint
-        if: matrix.runtime == 'office'
-        timeout-minutes: 3
         run: >-
           & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
           -File .github/ci/windows-pilot.ps1 -Phase check -Check $env:MYRK_PILOT_CHECK

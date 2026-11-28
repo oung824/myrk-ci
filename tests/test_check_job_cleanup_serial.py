@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 
 from myrk.actions import Action
-from myrk.checks import CheckReceipt, execute_check
+from myrk.checks import CheckReceipt, execute_check, prepare_check_runtime
 from myrk.permissions import AccessSettings
 from scripts import run_checks
 
@@ -82,6 +82,7 @@ def test_backend_retains_the_runtime_when_job_exit_is_unconfirmed(
 def test_application_waits_for_job_exit_before_completing_failed_check_cleanup(
     tmp_path: Path, hold_job_exit: tuple[Event, Event],
 ) -> None:
+    prepare_check_runtime()
     reported_active, release = hold_job_exit
     action = Action(task_id="job-exit-test", kind="check", target="进程退出")
     unrelated = subprocess.Popen([sys._base_executable, "-B", "-c", "import time; time.sleep(60)"])

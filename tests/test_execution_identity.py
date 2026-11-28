@@ -9,7 +9,7 @@ import pytest
 from pydantic_ai.models.function import FunctionModel
 
 from myrk.actions import Action, ActionExecutor, approval_context
-from myrk.checks import CheckReceipt, execute_check
+from myrk.checks import CheckReceipt, execute_check, prepare_check_runtime
 from myrk.conversation import Task
 from myrk.permissions import AccessSettings, ApprovalSettings
 from myrk.review import review_action
@@ -20,6 +20,7 @@ from myrk.task_control import TaskBudget
 def test_execution_reports_its_actual_kind_and_preserves_receipts_and_streams(
     tmp_path: Path, kind: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    prepare_check_runtime()
     application_variables = (
         "MYRK_PROCESS_OWNER_FILE",
         "MYRK_PROCESS_RECEIPT_DIRECTORY",
@@ -66,6 +67,7 @@ print('actual-error', file=sys.stderr)
 @pytest.mark.parametrize("kind", ["command", "send", "check"])
 @pytest.mark.parametrize("timeout", [False, True])
 def test_failed_execution_names_its_actual_kind_and_preserves_outputs(tmp_path: Path, kind: str, timeout: bool) -> None:
+    prepare_check_runtime()
     actions: list[Action] = []
     executor = ActionExecutor(actions=actions, budget=TaskBudget(Task(goal="保留程序实际结果", scope=None, request_limit=10)), save=lambda: None, notify=lambda action: None)
     script = "import sys,time;print('failure-output',flush=True);print('failure-error',file=sys.stderr,flush=True);" + ("time.sleep(30)" if timeout else "sys.exit(7)")
@@ -86,6 +88,7 @@ def test_failed_execution_names_its_actual_kind_and_preserves_outputs(tmp_path: 
 
 @pytest.mark.parametrize("kind", ["command", "send", "check"])
 def test_stopped_execution_keeps_its_identity_output_and_cleanup(tmp_path: Path, kind: str) -> None:
+    prepare_check_runtime()
     actions: list[Action] = []
     executor = ActionExecutor(actions=actions, budget=TaskBudget(Task(goal="停止正在运行的程序", scope=None, request_limit=10)), save=lambda: None, notify=lambda action: None)
 

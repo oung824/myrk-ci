@@ -81,7 +81,8 @@ def install_check_observation() -> None:
             (directory / "ancestry-failure.txt").write_text("".join(traceback.format_exception(task.exception())), encoding="utf-8")
 
     def launch(argv, *args, **kwargs):
-        if argv != checks.SUPERVISOR_RUNTIME.command():
+        runtime = checks.prepared_check_runtime()
+        if runtime is None or runtime.error is not None or argv != runtime.command():
             return original(argv, *args, **kwargs)
         receipt = directory / f"process-supervisor-{uuid4().hex}.json"
         process = original(argv, *args, **kwargs)

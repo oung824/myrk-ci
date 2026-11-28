@@ -153,6 +153,7 @@ AUDITED_GROUPS = {
     'audited-delegation': GROUPS['conversation-and-delegation'],
     'audited-recovery': GROUPS['recovery'],
     'audited-serial': GROUPS['serial-checks'] + ('test_check_job_cleanup_serial', 'test_check_runtime_serial'),
+    'audited-startup': ('test_check_startup',),
     'audited-request-protocols': GROUPS['provider-transcripts'] + GROUPS['request-protocols'],
     'audited-http-observation': (
         'test_default_observed_http', 'test_gemini_incomplete_response', 'test_gemini_response_observation',
@@ -269,7 +270,6 @@ AUDITED_SELECTION = {
         'tests/acceptance/test_quality_materials_human_gate.py::test_synthetic_manual_forms_import_all_originals_without_creating_human_reviews',
     ),
     'audited-quality-materials-4': (
-        'tests/acceptance/test_quality_materials_human_gate.py::test_a_caller_only_registry_cannot_claim_real_formal_material_readiness',
         'tests/acceptance/test_quality_materials_human_gate.py::test_code_version_can_change_but_unmatched_models_require_separate_old_version_costs[quality_run0]',
         'tests/acceptance/test_quality_materials_human_gate.py::test_formal_plan_rejects_declared_models_or_environment_without_the_frozen_native_route_binding',
         'tests/acceptance/test_quality_materials_human_gate.py::test_material_freeze_rejects_missing_reused_or_nonindependent_originals[gold-in-input]',

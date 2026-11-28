@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the backend expansion
         type: choice
-        options: [all, artifact-delivery, full-public-audited]
+        options: [all, artifact-delivery, full-public-audited, startup]
         default: all
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   backend:
     name: Backend ${{ matrix.group }}
-    if: inputs.focus != 'full-public-audited'
+    if: inputs.focus == 'all' || inputs.focus == 'artifact-delivery'
     runs-on: ${{ contains(fromJSON('["process-and-scheduling","root-git-hooks"]'), matrix.group) && 'windows-2025' || 'windows-11-arm' }}
     timeout-minutes: 25
     strategy:
@@ -118,4 +118,26 @@ jobs:
             $env:NODE_PATH = (Resolve-Path -LiteralPath 'desktop/node_modules').Path
           }
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_GROUP --expected-count $env:MYRK_CI_COUNT --expected-node-digest $env:MYRK_CI_NODE_DIGEST
+          exit $LASTEXITCODE
+
+  startup:
+    name: Backend audited-startup
+    if: inputs.focus == 'startup'
+    runs-on: windows-11-arm
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Verify startup case identities, behavior and process cleanup
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' audited-startup --expected-count 3 --expected-node-digest 2bca052647f5a34ba28f5548daa92a24074fad28e53b085e739b64f99caf4d3f
           exit $LASTEXITCODE

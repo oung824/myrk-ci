@@ -208,8 +208,9 @@ try {
         $namePattern = '^(?:' + ($publicSerialCases -join '|') + ')$'
         $arguments += @('--testNamePattern', $namePattern)
     }
+    $arguments += @('--reporter', 'json')
     if ($diagnostics.Count) {
-        $arguments += @('--reporter', 'json', '--includeTaskLocation')
+        $arguments += '--includeTaskLocation'
     }
     Write-CiSummary "- Selected Vitest files: $($selected.Count)."
 
@@ -260,29 +261,77 @@ try {
     Write-CiSummary "- Generated runtime cleanup recorded: $cleanupVerified. Runtime directory absent: $runtimeRemoved."
     Write-CiSummary "- Temporary configuration removed: $configurationRemoved. Protected generated locations unchanged: $protectedUnchanged."
 
+    $stage = 'vitest-report'
+    $jsonReport = Join-Path $results "$($receipts[0].BaseName)-reports" 'json/output.json'
+    if ($jsonReport -notin @($receipt.reports) -or !(Test-Path -LiteralPath $jsonReport -PathType Leaf)) {
+        throw 'The managed Vitest JSON report is missing.'
+    }
+    $report = Get-Content -LiteralPath $jsonReport -Raw | ConvertFrom-Json
+    $modules = @($report.testResults)
+    if ($modules.Count -ne $selected.Count) {
+        throw 'The Vitest JSON report does not cover the selected files.'
+    }
+
     $diagnosticVerified = $true
     if ($diagnostics.Count) {
-        $diagnosticVerified = $false
-        $diagnosticReport = Join-Path $results "$($receipts[0].BaseName)-reports" 'json/output.json'
-        if ($diagnosticReport -iin @($receipt.reports) -and (Test-Path -LiteralPath $diagnosticReport -PathType Leaf)) {
-            $report = Get-Content -LiteralPath $diagnosticReport -Raw | ConvertFrom-Json
-            $modules = @($report.testResults)
-            $diagnosticVerified = $modules.Count -eq $diagnostics.Count
-            foreach ($diagnostic in $diagnostics) {
-                $expectedModule = Join-Path $desktop $diagnostic.file
-                $matchingModules = @($modules | Where-Object { ([string]$_.name).Replace('/', '\') -ieq $expectedModule })
-                if ($matchingModules.Count -ne 1) {
-                    $diagnosticVerified = $false
-                    continue
-                }
-                $module = $matchingModules[0]
-                $actualCases = ($module.assertionResults.title | Sort-Object) -join "`n"
-                $expectedCases = ($diagnostic.cases | Sort-Object) -join "`n"
-                $diagnosticVerified = $diagnosticVerified -and $actualCases -ceq $expectedCases
-                Write-DesktopDiagnostic $diagnostic $module $root
+        $diagnosticVerified = $modules.Count -eq $diagnostics.Count
+        foreach ($diagnostic in $diagnostics) {
+            $expectedModule = Join-Path $desktop $diagnostic.file
+            $matchingModules = @($modules | Where-Object { ([string]$_.name).Replace('/', '\') -ieq $expectedModule })
+            if ($matchingModules.Count -ne 1) {
+                $diagnosticVerified = $false
+                continue
             }
+            $module = $matchingModules[0]
+            $actualCases = ($module.assertionResults.title | Sort-Object) -join "`n"
+            $expectedCases = ($diagnostic.cases | Sort-Object) -join "`n"
+            $diagnosticVerified = $diagnosticVerified -and $actualCases -ceq $expectedCases
+            Write-DesktopDiagnostic $diagnostic $module $root
         }
         Write-CiSummary "- Diagnostic case selection verified: $diagnosticVerified."
+    }
+
+    $seenFiles = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $seenCases = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $selectedSerialTitles = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    $passedCaseIds = [Collections.Generic.List[string]]::new()
+    $selectedCount = 0
+    foreach ($module in $modules) {
+        if (![IO.Path]::IsPathFullyQualified([string]$module.name) -or !$module.assertionResults) {
+            throw 'A Vitest JSON module lacks a source path or test cases.'
+        }
+        $file = [IO.Path]::GetRelativePath($desktop, $module.name).Replace('\', '/')
+        if ($file -cnotin $selected -or !$seenFiles.Add($file)) {
+            throw 'The Vitest JSON report contains an unexpected or duplicate file.'
+        }
+        foreach ($case in $module.assertionResults) {
+            $testName = [string]$case.fullName
+            if ([string]::IsNullOrEmpty($testName) -or $testName -match '[\r\n]') {
+                throw 'A Vitest JSON case lacks a valid full name.'
+            }
+            if ($case.ancestorTitles.Count) {
+                $testName = (@($case.ancestorTitles) + $case.title) -join ' > '
+            }
+            $caseId = "$($file)::$testName"
+            if (!$seenCases.Add($caseId)) {
+                throw 'The Vitest JSON report contains a duplicate test case.'
+            }
+            if ($filteredSerial) {
+                if ($testName -cnotin $publicSerialCases) {
+                    if ($case.status -cne 'skipped') {
+                        throw 'An unselected serial test was not reported as skipped.'
+                    }
+                    continue
+                }
+                if (!$selectedSerialTitles.Add($testName)) {
+                    throw 'A selected serial test title occurred in more than one report row.'
+                }
+            }
+            $selectedCount++
+            if ($case.status -ceq 'passed') {
+                $passedCaseIds.Add($caseId)
+            }
+        }
     }
 
     $stage = 'vitest-coverage'
@@ -309,12 +358,21 @@ try {
     } else {
         Write-CiSummary '- Vitest case counts unavailable.'
     }
+    $caseCoverageVerified = $report.success -eq $true -and $seenCases.Count -eq $report.numTotalTests -and
+        $selectedCount -eq $requested -and $passedCaseIds.Count -eq $passed -and $passedCaseIds.Count -eq $report.numPassedTests
+    Write-CiSummary "- Vitest JSON case identities: $($seenCases.Count) reported, $selectedCount selected, $($passedCaseIds.Count) passed. Counts verified: $caseCoverageVerified."
+
     $stage = 'result-verification'
     if ($exitCode -ne 0 -or $receipt.result -ne 0 -or !$coverageVerified -or !$diagnosticVerified -or !$cleanupVerified -or !$runtimeRemoved -or
         !$configurationRemoved -or !$protectedUnchanged -or $schedule.unhandled_errors -ne 0 -or $requested -lt 1 -or
-        $passed -ne $requested -or $contracts.Count -ne 6 -or $contracts.tests -lt 1 -or $contracts.pass -ne $contracts.tests) {
+        $passed -ne $requested -or !$caseCoverageVerified -or $contracts.Count -ne 6 -or $contracts.tests -lt 1 -or $contracts.pass -ne $contracts.tests) {
         throw 'The managed desktop result did not pass verification.'
     }
+    $orderedCaseIds = $passedCaseIds.ToArray()
+    [array]::Sort($orderedCaseIds, [StringComparer]::Ordinal)
+    $caseBytes = [Text.Encoding]::UTF8.GetBytes($orderedCaseIds -join "`n")
+    $caseDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($caseBytes)).ToLowerInvariant()
+    Write-CiSummary "- Passed desktop case IDs SHA-256: $caseDigest."
     Write-CiSummary "- Desktop behavior passed in $([Math]::Round($timer.Elapsed.TotalSeconds, 3)) s."
 } catch {
     Write-CiSummary "- Desktop behavior failed at $stage in $([Math]::Round($timer.Elapsed.TotalSeconds, 3)) s."

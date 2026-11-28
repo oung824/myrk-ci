@@ -4,18 +4,33 @@ import asyncio
 from collections.abc import Awaitable, Callable
 import ctypes
 from ctypes import wintypes
+from importlib import import_module
 import json
 import os
 from pathlib import Path
 import subprocess
-from typing import Any
+import sys
+from typing import Any, TYPE_CHECKING, cast
 from time import monotonic
 
 from myrk.actions import Action
 from myrk.permissions import AccessSettings
-from myrk.supervisor_runtime import SUPERVISOR_RUNTIME
 from myrk.windows_jobs import active_job_processes, job_exit_poll_delays, terminate_job
 from pydantic import BaseModel, ConfigDict, Field
+
+
+if TYPE_CHECKING:
+    from myrk.supervisor_runtime import SupervisorRuntime
+
+
+def prepare_check_runtime() -> None:
+    """Capture the trusted copy before accepting work."""
+    import_module("myrk.supervisor_runtime")
+
+
+def prepared_check_runtime() -> "SupervisorRuntime | None":
+    module = sys.modules.get("myrk.supervisor_runtime")
+    return cast("SupervisorRuntime | None", getattr(module, "SUPERVISOR_RUNTIME", None))
 
 
 class CheckFileVersion(BaseModel):
@@ -57,6 +72,10 @@ def job_active(name: str) -> int:
 
 async def execute_check(argv: list[str], cwd: Path, timeout: float, action: Action, *, access: AccessSettings, save: Callable[[], None], evidence_directory: Path, protected_paths: list[Path], extra_write_paths: list[str] | None = None,
                         network_decision: Callable[[dict[str, Any]], Awaitable[bool]] | None = None) -> str:
+    runtime = prepared_check_runtime()
+    if runtime is None:
+        raise OSError("应用启动时尚未准备可信执行副本，已停止检查。")
+    supervisor = runtime.command()
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.CreateJobObjectW.argtypes, kernel.CreateJobObjectW.restype = [ctypes.c_void_p, wintypes.LPCWSTR], wintypes.HANDLE
     kernel.OpenProcess.argtypes, kernel.OpenProcess.restype = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD], wintypes.HANDLE
@@ -85,11 +104,11 @@ async def execute_check(argv: list[str], cwd: Path, timeout: float, action: Acti
             pending.write_text(json.dumps({"allowed": allowed}), encoding="utf-8")
             pending.replace(path.with_suffix(".decision"))
     try:
-        process = subprocess.Popen(SUPERVISOR_RUNTIME.command(),
+        process = subprocess.Popen(supervisor,
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                   cwd=SUPERVISOR_RUNTIME.directory,
+                                   cwd=runtime.directory,
                                    env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-                                   startupinfo=subprocess.STARTUPINFO(lpAttributeList={"handle_list": SUPERVISOR_RUNTIME.handles}),
+                                   startupinfo=subprocess.STARTUPINFO(lpAttributeList={"handle_list": runtime.handles}),
                                    creationflags=subprocess.CREATE_NO_WINDOW)
         action.process_id, action.cwd = process.pid, str(cwd)
         action.cleanup_complete = False
@@ -103,7 +122,7 @@ async def execute_check(argv: list[str], cwd: Path, timeout: float, action: Acti
         finally:
             kernel.CloseHandle(handle)
         save()
-        communication = asyncio.create_task(asyncio.to_thread(process.communicate, (json.dumps({"argv": argv, "cwd": str(cwd), "application_root": str(Path(__file__).parent.parent), "action_id": action.id, "receipt_path": action.receipt_path, "stdout_path": action.stdout_path, "stderr_path": action.stderr_path, "access": access.model_dump(), "runtime_roots": [str(path) for path in SUPERVISOR_RUNTIME.host_roots], "protected_paths": [str(path) for path in [*protected_paths, SUPERVISOR_RUNTIME.directory, *SUPERVISOR_RUNTIME.host_roots]], "extra_write_paths": extra_write_paths or []}) + "\n").encode()))
+        communication = asyncio.create_task(asyncio.to_thread(process.communicate, (json.dumps({"argv": argv, "cwd": str(cwd), "application_root": str(Path(__file__).parent.parent), "action_id": action.id, "receipt_path": action.receipt_path, "stdout_path": action.stdout_path, "stderr_path": action.stderr_path, "access": access.model_dump(), "runtime_roots": [str(path) for path in runtime.host_roots], "protected_paths": [str(path) for path in [*protected_paths, runtime.directory, *runtime.host_roots]], "extra_write_paths": extra_write_paths or []}) + "\n").encode()))
         prepared = monotonic()
         started: float | None = None
         last_tick = monotonic()
