@@ -1,0 +1,1 @@
+Use the selected native model and requested reasoning setting. Read roundtrip.txt with the native read_text tool, then report its exact content. Do not write files or contact any other receiver.

@@ -176,8 +176,9 @@ jobs:
           Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination "$history/index.json"
           if ($env:MYRK_AUX_GROUP.StartsWith('provider-')) {
             $catalogue = 'tests/acceptance/materials/connection-desktop'
-            if (Test-Path -LiteralPath $catalogue) { throw 'Expected a new empty catalogue' }
-            New-Item -ItemType Directory -Path $catalogue -ErrorAction Stop | Out-Null
+            if (-not (Test-Path -LiteralPath $catalogue)) {
+              New-Item -ItemType Directory -Path $catalogue -ErrorAction Stop | Out-Null
+            }
           }
       - name: Verify the exact selected offline tests
         env:

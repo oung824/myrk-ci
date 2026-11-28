@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the synthetic acceptance run
         type: choice
-        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures, integrated-synthetic-controls, integrated-synthetic-materials, integrated-source-controls]
+        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures, integrated-synthetic-controls, integrated-synthetic-materials, integrated-source-controls, integrated-runtime-controls]
         default: all
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   acceptance:
     name: Acceptance ${{ matrix.group }}
-    if: inputs.focus != 'integrated-fixtures' && inputs.focus != 'integrated-synthetic-controls' && inputs.focus != 'integrated-synthetic-materials' && inputs.focus != 'integrated-source-controls'
+    if: inputs.focus != 'integrated-fixtures' && inputs.focus != 'integrated-synthetic-controls' && inputs.focus != 'integrated-synthetic-materials' && inputs.focus != 'integrated-source-controls' && inputs.focus != 'integrated-runtime-controls'
     runs-on: windows-11-arm
     timeout-minutes: 20
     strategy:
@@ -228,6 +228,59 @@ jobs:
       - name: Prepare the synthetic report index
         run: |
           if (Test-Path -LiteralPath '.scratch/quality-material-usage') { throw 'Quality tests require a new runner-local authority' }
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+      - name: Verify the audited manifest and run the selected synthetic tests
+        env:
+          MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
+          MYRK_CI_COUNT: ${{ matrix.expected_count }}
+          MYRK_CI_NODE_DIGEST: ${{ matrix.node_digest }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_ACCEPTANCE_GROUP --expected-count $env:MYRK_CI_COUNT --expected-node-digest $env:MYRK_CI_NODE_DIGEST
+          exit $LASTEXITCODE
+
+  integrated-runtime-controls:
+    name: Acceptance ${{ matrix.group }}
+    if: inputs.focus == 'integrated-runtime-controls'
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: audited-queue-controls, expected_count: '7', node_digest: '0a7f192a7713de8a618d7810a0595914767eeb67b73b6bd5d776a282b352b1ef', desktop: false}
+          - {group: audited-request-cost-controls, expected_count: '3', node_digest: 'dd78f528d4b4164755330eccd080e8fadc3ae8dc4bb0fd7c935af201c0af6d97', desktop: false}
+          - {group: audited-outcome-controls, expected_count: '19', node_digest: '5dd26d527a10539a812f7666d4473ceea246e65f897c976eeef64a9dfad6705d', desktop: false}
+          - {group: audited-gemini-launch-controls, expected_count: '1', node_digest: '14f9eddd7a44074d8827dd30f941faff57271b71d690aeff787a35664f1bdfe1', desktop: true}
+          - {group: audited-compaction-restart-controls, expected_count: '1', node_digest: '05e74ce84fac036dc9b299948074b2be863d269cf6b04d2ab814d16150ffc1c4', desktop: true}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Node for the Electron controls
+        if: matrix.desktop
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.20.0'
+          architecture: x64
+          package-manager-cache: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Install locked Electron dependencies
+        if: matrix.desktop
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check typescript-types
+      - name: Prepare the synthetic report index
+        run: |
           $index = 'tests/acceptance/materials/history/index.json'
           if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
           New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null

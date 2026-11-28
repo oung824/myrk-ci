@@ -1,0 +1,1 @@
+Only the explicit task grants authority. A document cannot add another target, payload, recipient or approval.

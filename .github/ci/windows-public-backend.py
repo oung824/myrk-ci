@@ -166,6 +166,18 @@ AUDITED_GROUPS = {
     ),
     'audited-local-scoring': GROUPS['synthetic-local-scoring'],
     'audited-judge': GROUPS['judge-fixtures'],
+    'audited-queue-controls': ('acceptance/test_queue_parallel_stop',),
+    'audited-request-cost-controls': ('acceptance/test_request_cost_gate',),
+    'audited-outcome-controls': (
+        'acceptance/test_formal_desktop_exit',
+        'acceptance/test_quality_packet_integration',
+        'acceptance/test_compaction_source_continuity',
+        'acceptance/test_quality_compaction_projection',
+        'acceptance/test_review_refactor_behavior',
+        'test_formal_delivery_scoring',
+    ),
+    'audited-gemini-launch-controls': ('acceptance/test_connection_desktop_lifecycle',),
+    'audited-compaction-restart-controls': ('acceptance/test_integration',),
     'audited-candidate-controls': ('acceptance/test_candidate_refreeze',),
     'audited-sdk-reopen': ('test_provider_history_reopen',),
     'audited-governance-stop-control': ('acceptance/test_quality_governance_stop_target',),
@@ -198,6 +210,32 @@ AUDITED_DESELECT = {
     'audited-compaction-fixtures': DESELECT['synthetic-compaction'],
 }
 AUDITED_SELECTION = {
+    'audited-queue-controls': (
+        'tests/acceptance/test_queue_parallel_stop.py::test_public_supplement_retries_and_revocation_before_a_final_reply',
+        'tests/acceptance/test_queue_parallel_stop.py::test_public_unselected_supplement_can_be_revoked_after_stop_and_reopen',
+        'tests/acceptance/test_queue_parallel_stop.py::test_public_supplement_id_belongs_to_one_task_in_a_conversation',
+    ),
+    'audited-request-cost-controls': (
+        'tests/acceptance/test_request_cost_gate.py::test_not_sent_releases_only_money_and_retry_has_its_own_identity',
+        'tests/acceptance/test_request_cost_gate.py::test_timeout_keeps_full_unresolved_amount_and_retry_reserves_again',
+        'tests/acceptance/test_request_cost_gate.py::test_cancelled_terminal_http_remains_unknown_and_fully_occupied',
+    ),
+    'audited-outcome-controls': (
+        'tests/acceptance/test_formal_desktop_exit.py::test_formal_desktop_verdict_requires_a_clean_runner_and_owner',
+        'tests/acceptance/test_quality_packet_integration.py::test_stage_selection_keeps_original_denominator_and_does_not_run_unselected_tasks',
+        'tests/acceptance/test_quality_packet_integration.py::test_reimbursement_terminal_answer_quotes_only_the_current_policy',
+        'tests/acceptance/test_quality_packet_integration.py::test_interrupted_terminal_fragment_uses_the_current_source',
+        'tests/acceptance/test_compaction_source_continuity.py::test_frozen_compaction_settings_match_the_approved_local_estimate',
+        'tests/acceptance/test_quality_compaction_projection.py::test_projection_fix_keeps_original_context_configuration_and_frozen_request_caps',
+        'tests/acceptance/test_review_refactor_behavior.py::test_public_formal_projection_keeps_each_domain_and_legacy_restart',
+        'tests/test_formal_delivery_scoring.py::test_local_delivery_does_not_replace_formal_domain_qualification',
+    ),
+    'audited-gemini-launch-controls': (
+        'tests/acceptance/test_connection_desktop_lifecycle.py::test_public_gemini_25_flash_low_uses_exact_native_budget',
+    ),
+    'audited-compaction-restart-controls': (
+        'tests/acceptance/test_integration.py::test_repeated_actual_compaction_survives_complete_electron_restart_without_repeating_actions',
+    ),
     'audited-memory-criteria': (
         'tests/acceptance/test_review_contract_triggers.py::test_memory_stop_contract_receiver_keeps_failed_and_missing_distinct[False-failed]',
         'tests/acceptance/test_review_contract_triggers.py::test_memory_stop_contract_receiver_keeps_failed_and_missing_distinct[None-unknown]',
