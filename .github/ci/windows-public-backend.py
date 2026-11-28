@@ -166,6 +166,13 @@ AUDITED_GROUPS = {
     ),
     'audited-local-scoring': GROUPS['synthetic-local-scoring'],
     'audited-judge': GROUPS['judge-fixtures'],
+    'audited-memory-criteria': ('acceptance/test_review_contract_triggers',),
+    'audited-quality-materials-1': ('acceptance/test_quality_materials_human_gate',),
+    'audited-quality-materials-2': ('acceptance/test_quality_materials_human_gate',),
+    'audited-quality-materials-3': ('acceptance/test_quality_materials_human_gate',),
+    'audited-quality-materials-4': ('acceptance/test_quality_materials_human_gate',),
+    'audited-quality-materials-5': ('acceptance/test_quality_materials_human_gate',),
+    'audited-quality-materials-6': ('acceptance/test_quality_materials_human_gate',),
     'audited-integration-controls': ('acceptance/test_integration_contract',),
     'audited-formal-http-controls': ('acceptance/test_formal_http_binding',),
     'audited-historical-controls': ('acceptance/test_historical_reuse_regrading',),
@@ -188,6 +195,70 @@ AUDITED_DESELECT = {
     'audited-compaction-fixtures': DESELECT['synthetic-compaction'],
 }
 AUDITED_SELECTION = {
+    'audited-memory-criteria': (
+        'tests/acceptance/test_review_contract_triggers.py::test_memory_stop_contract_receiver_keeps_failed_and_missing_distinct[False-failed]',
+        'tests/acceptance/test_review_contract_triggers.py::test_memory_stop_contract_receiver_keeps_failed_and_missing_distinct[None-unknown]',
+        'tests/acceptance/test_review_contract_triggers.py::test_memory_stop_contract_receiver_keeps_failed_and_missing_distinct[True-passed]',
+        'tests/acceptance/test_review_contract_triggers.py::test_memory_without_a_stop_branch_keeps_no_trigger_na',
+    ),
+    'audited-quality-materials-1': (
+        'tests/acceptance/test_quality_materials_human_gate.py::test_actual_domain_standard_drift_does_not_create_a_ready_review_package[quality_run0]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_domain_dimensions_cannot_be_added_after_observing_the_original_output[quality_run0]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_per_task_frozen_domain_standard_preserves_critical_dimensions_in_human_forms[quality_run0]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_review_and_reference_survive_retiring_source_materials_but_copies_cannot_execute[unavailable-quality_run0]',
+    ),
+    'audited-quality-materials-2': (
+        'tests/acceptance/test_quality_materials_human_gate.py::test_adjustment_before_export_cannot_be_forgotten_by_packaged_freeze[quality_run0]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_formal_material_used_for_a_fix_becomes_regression_without_erasing_original_results',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_quality_export_includes_frozen_gold_authorization_and_scoring_bytes_only_for_review',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_review_and_reference_survive_retiring_source_materials_but_copies_cannot_execute[unused-quality_run0]',
+    ),
+    'audited-quality-materials-3': (
+        'tests/acceptance/test_quality_materials_human_gate.py::test_applicable_gemini_tool_roundtrip_is_required_even_when_general_quality_hits_the_line[quality_run0]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_legacy_undeclared_adapter_cannot_be_relabelled_common_only_after_generation[quality_run0]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_quality_reference_is_immutable_matches_materials_and_uses_integer_regression_limits',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_synthetic_manual_forms_import_all_originals_without_creating_human_reviews',
+    ),
+    'audited-quality-materials-4': (
+        'tests/acceptance/test_quality_materials_human_gate.py::test_a_caller_only_registry_cannot_claim_real_formal_material_readiness',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_code_version_can_change_but_unmatched_models_require_separate_old_version_costs[quality_run0]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_formal_plan_rejects_declared_models_or_environment_without_the_frozen_native_route_binding',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_material_freeze_rejects_missing_reused_or_nonindependent_originals[gold-in-input]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_material_freeze_rejects_missing_reused_or_nonindependent_originals[renamed-input]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_material_freeze_rejects_missing_reused_or_nonindependent_originals[used-formal]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_missing_or_conflicting_domain_standard_blocks_quality_execution_before_sending[critical]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_missing_or_conflicting_domain_standard_blocks_quality_execution_before_sending[version]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_missing_required_summaries_cannot_be_hidden_by_a_passing_main_answer[quality_run0]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_quality_threshold_boundaries_keep_failures_unknowns_and_gemini_contracts_separate',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_shared_screening_is_one_preplanned_generation_with_stricter_cap_and_original_quality_denominator',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_usage_authority_refuses_reinitialization_and_truncated_journal[outside_evidence]',
+    ),
+    'audited-quality-materials-5': (
+        'tests/acceptance/test_quality_materials_human_gate.py::test_candidate_source_drift_requires_same_parent_stage_refreeze_and_preserves_closed_original',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_code_version_can_change_but_unmatched_models_require_separate_old_version_costs[quality_run1]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_freeze_binds_real_bytes_distinct_families_and_exact_quality_schedule',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_material_freeze_rejects_missing_reused_or_nonindependent_originals[judge-family]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_material_freeze_rejects_missing_reused_or_nonindependent_originals[shapes]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_material_readiness_requires_the_public_execution_adapters_and_keeps_synthetic_status',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_missing_or_conflicting_domain_standard_blocks_quality_execution_before_sending[missing]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_missing_review_gold_and_wrong_execution_mapping_are_rejected_before_import',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_prior_read_only_quality_review_does_not_become_tuning_or_forge_historical_applicability',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_relabeling_a_synthetic_reference_cannot_establish_an_actual_human_baseline',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_usage_authority_refuses_reinitialization_and_truncated_journal[changed_record]',
+    ),
+    'audited-quality-materials-6': (
+        'tests/acceptance/test_quality_materials_human_gate.py::test_copying_and_refreezing_the_same_input_and_goal_does_not_reset_observed_use',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_critical_failure_is_not_averaged_into_general_quality',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_material_freeze_rejects_missing_reused_or_nonindependent_originals[family]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_material_freeze_rejects_missing_reused_or_nonindependent_originals[missing]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_material_freeze_rejects_missing_reused_or_nonindependent_originals[template]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_missing_or_conflicting_domain_standard_blocks_quality_execution_before_sending[base-critical]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_missing_or_conflicting_domain_standard_blocks_quality_execution_before_sending[unknown]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_packaged_freeze_cannot_restore_unseen_status_after_formal_material_adjustment',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_quality_plan_reuses_frozen_execution_parent_caps_and_evaluator_only_gold',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_review_and_reference_survive_retiring_source_materials_but_copies_cannot_execute[adjusted-quality_run0]',
+        'tests/acceptance/test_quality_materials_human_gate.py::test_usage_authority_refuses_reinitialization_and_truncated_journal[missing_record]',
+    ),
     'audited-integration-controls': (
         'tests/acceptance/test_integration_contract.py::test_missing_evidence_link_stops_the_shared_run',
         'tests/acceptance/test_integration_contract.py::test_incomplete_publication_retains_only_a_proven_stop_failure',
@@ -442,7 +513,7 @@ def main():
     started = monotonic()
     stage = 'inventory'
     try:
-        inventory = [name for names in groups.values() for name in names]
+        inventory = [name for key, names in groups.items() if key not in AUDITED_SELECTION for name in names]
         if len(inventory) != len(set(inventory)) or any(not (ROOT / path).is_file() for path in paths):
             raise CheckError('A test file is duplicated across groups or missing from this group.')
         stage = 'collection'

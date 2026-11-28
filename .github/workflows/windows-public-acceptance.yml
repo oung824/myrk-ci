@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the synthetic acceptance run
         type: choice
-        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures, integrated-synthetic-controls]
+        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures, integrated-synthetic-controls, integrated-synthetic-materials]
         default: all
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   acceptance:
     name: Acceptance ${{ matrix.group }}
-    if: inputs.focus != 'integrated-fixtures' && inputs.focus != 'integrated-synthetic-controls'
+    if: inputs.focus != 'integrated-fixtures' && inputs.focus != 'integrated-synthetic-controls' && inputs.focus != 'integrated-synthetic-materials'
     runs-on: windows-11-arm
     timeout-minutes: 20
     strategy:
@@ -134,6 +134,50 @@ jobs:
           -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
       - name: Prepare the synthetic report index
         run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+      - name: Verify the audited manifest and run the selected synthetic tests
+        env:
+          MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
+          MYRK_CI_COUNT: ${{ matrix.expected_count }}
+          MYRK_CI_NODE_DIGEST: ${{ matrix.node_digest }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_ACCEPTANCE_GROUP --expected-count $env:MYRK_CI_COUNT --expected-node-digest $env:MYRK_CI_NODE_DIGEST
+          exit $LASTEXITCODE
+
+  integrated-synthetic-materials:
+    name: Acceptance ${{ matrix.group }}
+    if: inputs.focus == 'integrated-synthetic-materials'
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: audited-memory-criteria, expected_count: '4', node_digest: '779b21bad6e4fac3ab3323c3ae614f32e4f1dedfcb987bddf9e7db07d939dfa5'}
+          - {group: audited-quality-materials-1, expected_count: '4', node_digest: '7b66b3ad9c69b399d80613fd5d91dc1f2d589bafedca67e59674baac2c536621'}
+          - {group: audited-quality-materials-2, expected_count: '4', node_digest: '5418b204920be0f3444ef766572a6b8936d13a8b664c413d4651d4b6987b73b1'}
+          - {group: audited-quality-materials-3, expected_count: '4', node_digest: '9ea55ad556c7e1d7b4b417364d688253ea7d45c595ce80413ef74cd39273a7b0'}
+          - {group: audited-quality-materials-4, expected_count: '12', node_digest: '4102b5cc21dc34667eef657a4fb4d99e9e48dfbddaa7058290e659f65a64b198'}
+          - {group: audited-quality-materials-5, expected_count: '11', node_digest: 'bab7d3dfdbd211febd1f49bd6591006dc23631ffc586c807496ecb93e38e5c59'}
+          - {group: audited-quality-materials-6, expected_count: '11', node_digest: 'ffd602ac60f54d11e0f585d7eea1423f36c2f74d97566ac565e34fa7954eb1c9'}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Prepare the synthetic report index
+        run: |
+          if (Test-Path -LiteralPath '.scratch/quality-material-usage') { throw 'Quality tests require a new runner-local authority' }
           $index = 'tests/acceptance/materials/history/index.json'
           if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
           New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
