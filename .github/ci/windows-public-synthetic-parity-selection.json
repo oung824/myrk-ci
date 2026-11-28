@@ -1,0 +1,59 @@
+{
+  "governance-action-identity": {
+    "nodeids": [
+      "tests/acceptance/test_quality_governance_refusal_identity.py::test_refusal_score_requires_observed_action_task_identity[conflicting-desktop]",
+      "tests/acceptance/test_quality_governance_refusal_identity.py::test_refusal_score_requires_observed_action_task_identity[conflicting-inprocess]",
+      "tests/acceptance/test_quality_governance_refusal_identity.py::test_refusal_score_requires_observed_action_task_identity[matching-desktop]",
+      "tests/acceptance/test_quality_governance_refusal_identity.py::test_refusal_score_requires_observed_action_task_identity[matching-inprocess]",
+      "tests/acceptance/test_quality_governance_refusal_identity.py::test_refusal_score_requires_observed_action_task_identity[missing-desktop]",
+      "tests/acceptance/test_quality_governance_refusal_identity.py::test_refusal_score_requires_observed_action_task_identity[missing-inprocess]"
+    ],
+    "sha256": "8e394596e3dda5e498c046d4e22c434696f016b200d4da0c7d43cd2bef124812",
+    "assertion_fixture": "governance-action-identity-assertion.py"
+  },
+  "governance-child-rows": {
+    "nodeids": [
+      "tests/acceptance/test_quality_governance_execution.py::test_delegation_score_requires_both_original_rows_in_child_tool_returns"
+    ],
+    "sha256": "cddd3c3f3d0354e2381da4ce05017800f74390e0c52fe6aa85327d8421969b63",
+    "assertion_fixture": "governance-child-rows-assertion.py"
+  },
+  "governance-measurement-limit": {
+    "nodeids": [
+      "tests/acceptance/test_quality_governance_basics.py::test_unit_score_distinguishes_reportable_measurement_from_limit_pause"
+    ],
+    "sha256": "032eb1187a6b7d762c3cdc5f1703547ac57349f9f548f0ba3222ed7be667373e",
+    "assertion_fixture": "governance-measurement-limit-assertion.py"
+  },
+  "governance-refusal": {
+    "nodeids": [
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_action_with_null_exchange-unknown-failed-failed]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_conflicting_stop_sdk-unknown-passed-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_corrupt_prefix-failed-passed-failed]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_duplicate_ordinal-unknown-passed-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_missing_earlier_row-failed-passed-failed]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_missing_earlier_sdk-failed-passed-failed]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_missing_ledger-unknown-passed-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_missing_stop_ordinal-unknown-passed-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_missing_wire-unknown-passed-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_reordered_stop_snapshot-unknown-passed-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_reused_stop_sdk-unknown-passed-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_unbound-unknown-passed-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[late_retry_unsent_stop_ordinal-unknown-passed-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[mismatched_nested_finished-passed-unknown-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[mismatched_nested_late_action-passed-unknown-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[mismatched_outer_finished-passed-unknown-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_binds_each_proven_stop_violation[mismatched_outer_late_action-passed-unknown-unknown]",
+      "tests/acceptance/test_quality_governance_instances.py::test_refusal_score_requires_denial_of_the_registered_candidate"
+    ],
+    "sha256": "7052a3ecd3fe3a29c3df21a4015081f872b2c43280bd2df3e70fa784a9f44bff",
+    "assertion_fixture": null
+  },
+  "memory-save-rejection": {
+    "nodeids": [
+      "tests/acceptance/test_memory.py::test_unsaved_notes_remain_absent_and_failed_batches_do_not_partially_apply[save-failure]"
+    ],
+    "sha256": "f77828e36a4a4ca7dfd9def03ac2fc041fc2b8e150144572970b010b8067cc5f",
+    "assertion_fixture": null
+  }
+}
