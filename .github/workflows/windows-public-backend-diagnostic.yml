@@ -6,7 +6,7 @@ on:
       focus:
         description: Run the four reproduced cases, full files, or integrated runner checks
         type: choice
-        options: [cases, files, integrated, artifact, auxiliary, file-behavior, isolated-formal, source-only-controls, synthetic-material-parity]
+        options: [cases, files, integrated, artifact, auxiliary, file-behavior, isolated-formal, source-only-controls, synthetic-material-parity, registry-parity]
         default: cases
 
 permissions:
@@ -318,4 +318,32 @@ jobs:
           MYRK_CI_PARITY_GROUP: ${{ matrix.group }}
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-synthetic-parity.py' $env:MYRK_CI_PARITY_GROUP
+          exit $LASTEXITCODE
+
+  registry-parity:
+    name: Public registry behavior ${{ matrix.group }}
+    if: inputs.focus == 'registry-parity'
+    runs-on: windows-11-arm
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [historical-cli-report, caller-only-readiness]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python and the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Verify history CLI and caller-only readiness
+        env:
+          MYRK_CI_REGISTRY_PARITY: ${{ matrix.group }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-registry-parity.py' $env:MYRK_CI_REGISTRY_PARITY
           exit $LASTEXITCODE
