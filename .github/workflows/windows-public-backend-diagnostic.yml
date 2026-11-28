@@ -6,7 +6,7 @@ on:
       focus:
         description: Run the four reproduced cases, full files, or integrated runner checks
         type: choice
-        options: [cases, files, integrated, artifact, ticket-04, auxiliary, file-behavior, isolated-formal, source-only-controls, synthetic-material-parity, synthetic-child-rows, registry-parity, quality-packet-behavior]
+        options: [cases, files, integrated, artifact, ticket-04, ticket-04-conversation, auxiliary, file-behavior, isolated-formal, source-only-controls, synthetic-material-parity, synthetic-child-rows, registry-parity, quality-packet-behavior]
         default: cases
 
 permissions:
@@ -94,13 +94,16 @@ jobs:
 
   ticket-04:
     name: Ticket 04 / ${{ matrix.scope }}
-    if: inputs.focus == 'ticket-04' || inputs.focus == 'artifact'
+    if: contains(fromJSON('["ticket-04","ticket-04-conversation","artifact"]'), inputs.focus)
     runs-on: windows-11-arm
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        scope: ${{ fromJSON(inputs.focus == 'artifact' && '["artifacts"]' || '["artifacts","conversation","controls"]') }}
+        scope: >-
+          ${{ fromJSON(inputs.focus == 'artifact' && '["artifacts"]' ||
+          inputs.focus == 'ticket-04-conversation' && '["conversation"]' ||
+          '["artifacts","conversation","controls"]') }}
     defaults:
       run:
         shell: pwsh

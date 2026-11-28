@@ -72,7 +72,8 @@ GROUPS = {
         'test_artifacts', 'test_artifact_reopen', 'test_extensions', 'test_independent_delivery',
     ),
     'conversation-and-delegation': (
-        'test_context', 'test_conversation', 'test_delegation', 'test_delegation_verification_status',
+        'test_context', 'test_conversation', 'test_conversation_execution', 'test_conversation_recovery',
+        'test_conversation_tools', 'test_delegation', 'test_delegation_verification_status',
         'test_independent_conversation', 'test_task_goal_context',
     ),
     'desktop-conversation': ('test_desktop_service', 'test_live_settings', 'test_window'),
