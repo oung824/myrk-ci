@@ -73,6 +73,11 @@ try {
     if ($UseSamplingPython) {
         $archive = Join-Path $runtime 'python-3.13.0-embed-amd64.zip'
         $sampler = Join-Path $runtime 'sampler'
+        if ($Group -ceq 'retained-judge-provenance') {
+            if (!$mounted) { throw 'The retained judge cases require the job-owned E compatibility drive.' }
+            $sampler = Join-Path $mount 'Myrk/.scratch/judge-sampling-python-3.13.0/runtime'
+            $null = [IO.Directory]::CreateDirectory($sampler)
+        }
         Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.13.0/python-3.13.0-embed-amd64.zip' -OutFile $archive
         $expectedSha256 = '01c32d0737432240adcf0bbc1d32327f0976d3a1e1427774bc8febc8f1c03111'
         if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedSha256) {
@@ -80,6 +85,12 @@ try {
         }
         Expand-Archive -LiteralPath $archive -DestinationPath $sampler
         $env:MYRK_JUDGE_SAMPLING_PYTHON = Join-Path $sampler 'python.exe'
+        if ($Group -ceq 'retained-judge-provenance') {
+            $fixtureSampler = 'E:\Myrk\.scratch\judge-sampling-python-3.13.0\runtime\python.exe'
+            & $python -B -c $verifyLink $fixtureSampler $env:MYRK_JUDGE_SAMPLING_PYTHON
+            if ($LASTEXITCODE -ne 0) { throw 'The frozen test fixture does not resolve to the downloaded sampler.' }
+            $env:MYRK_JUDGE_SAMPLING_PYTHON = $fixtureSampler
+        }
         & $env:MYRK_JUDGE_SAMPLING_PYTHON -I -S -B -c 'import sys; sys.exit(sys.implementation.name != "cpython" or sys.version_info[:3] != (3, 13, 0))'
         if ($LASTEXITCODE -ne 0) { throw 'The sampler did not start as CPython 3.13.0.' }
         $samplerProof = '- Verified the pinned CPython 3.13.0 sampler archive and runtime.'
