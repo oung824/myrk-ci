@@ -6,7 +6,7 @@ on:
       focus:
         description: Run the four reproduced cases, full files, or integrated runner checks
         type: choice
-        options: [cases, files, integrated, artifact]
+        options: [cases, files, integrated, artifact, auxiliary]
         default: cases
 
 permissions:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   diagnosis:
-    if: inputs.focus != 'artifact'
+    if: inputs.focus != 'artifact' && inputs.focus != 'auxiliary'
     name: Diagnose ${{ matrix.name }}
     runs-on: windows-11-arm
     timeout-minutes: 12
@@ -126,4 +126,64 @@ jobs:
           sys.exit(driver["main"]())
           '@
           $diagnose | & '.venv/Scripts/python.exe' -B -
+          exit $LASTEXITCODE
+
+  auxiliary:
+    name: Acceptance ${{ matrix.group }}
+    if: inputs.focus == 'auxiliary'
+    runs-on: windows-11-arm
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: qualified-adoption, count: '25', digest: '73bcec92636f1fa23f36df46915ede291e5e053d7364277ef17df306fcafeeb0', electron: false}
+          - {group: provider-mocks, count: '20', digest: 'e9705be10799fd798cd36f3da85edfec9910ce1da05afbbd2819d64d71ed16c0', electron: false}
+          - {group: provider-electron, count: '1', digest: '2f3ae1f17c3f6871214e2d6d5666e029ee7acd058733d8b8fc32de995f2c45d2', electron: true}
+          - {group: resume-mocks, count: '18', digest: 'd207cb8e430d3373f33e3d2f843d965a5beb4ed9363736557e582fddc88b34bc', electron: false}
+          - {group: resume-electron, count: '1', digest: '3f4e2ed7561d5b25e50272ff2238318802044675e06585427ae41156768644b8', electron: true}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up x64 Node.js
+        if: matrix.electron
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.20.0'
+          architecture: x64
+          package-manager-cache: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Install locked desktop dependencies and Electron
+        if: matrix.electron
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check typescript-types
+      - name: Prepare isolated synthetic registrations
+        env:
+          MYRK_AUX_GROUP: ${{ matrix.group }}
+        run: |
+          $history = 'tests/acceptance/materials/history'
+          if (Test-Path -LiteralPath "$history/index.json") { throw 'Synthetic history requires an empty checkout' }
+          New-Item -ItemType Directory -Path $history -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination "$history/index.json"
+          if ($env:MYRK_AUX_GROUP.StartsWith('provider-')) {
+            $catalogue = 'tests/acceptance/materials/connection-desktop'
+            if (Test-Path -LiteralPath $catalogue) { throw 'Expected a new empty catalogue' }
+            New-Item -ItemType Directory -Path $catalogue -ErrorAction Stop | Out-Null
+          }
+      - name: Verify the exact selected offline tests
+        env:
+          MYRK_AUX_GROUP: ${{ matrix.group }}
+          MYRK_AUX_COUNT: ${{ matrix.count }}
+          MYRK_AUX_DIGEST: ${{ matrix.digest }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-auxiliary.py' $env:MYRK_AUX_GROUP $env:MYRK_AUX_COUNT $env:MYRK_AUX_DIGEST
           exit $LASTEXITCODE
