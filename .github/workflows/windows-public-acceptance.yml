@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the synthetic acceptance run
         type: choice
-        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures, integrated-synthetic-controls, integrated-synthetic-materials]
+        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures, integrated-synthetic-controls, integrated-synthetic-materials, integrated-source-controls]
         default: all
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   acceptance:
     name: Acceptance ${{ matrix.group }}
-    if: inputs.focus != 'integrated-fixtures' && inputs.focus != 'integrated-synthetic-controls' && inputs.focus != 'integrated-synthetic-materials'
+    if: inputs.focus != 'integrated-fixtures' && inputs.focus != 'integrated-synthetic-controls' && inputs.focus != 'integrated-synthetic-materials' && inputs.focus != 'integrated-source-controls'
     runs-on: windows-11-arm
     timeout-minutes: 20
     strategy:
@@ -91,13 +91,15 @@ jobs:
           Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
           if ($env:MYRK_CI_ACCEPTANCE_GROUP -eq 'audited-delegation-fixtures') {
             $delegation = 'tests/acceptance/materials/delegation'
-            if (Test-Path -LiteralPath $delegation) { throw 'Synthetic delegation must use a new directory' }
-            New-Item -ItemType Directory -Path $delegation -ErrorAction Stop | Out-Null
+            if (-not (Test-Path -LiteralPath $delegation)) {
+              New-Item -ItemType Directory -Path $delegation -ErrorAction Stop | Out-Null
+            }
           }
           if ($env:MYRK_CI_ACCEPTANCE_GROUP -eq 'audited-compaction-fixtures') {
             $compaction = 'tests/acceptance/materials/compaction/inputs.json'
-            if (Test-Path -LiteralPath $compaction) { throw 'Synthetic compaction must use a new file' }
-            Set-Content -LiteralPath $compaction -Value '{}' -Encoding utf8NoBOM -ErrorAction Stop
+            if (-not (Test-Path -LiteralPath $compaction)) {
+              Set-Content -LiteralPath $compaction -Value '{}' -Encoding utf8NoBOM -ErrorAction Stop
+            }
           }
       - name: Verify the audited manifest and run the selected synthetic tests
         env:
@@ -171,6 +173,54 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Prepare the synthetic report index
+        run: |
+          if (Test-Path -LiteralPath '.scratch/quality-material-usage') { throw 'Quality tests require a new runner-local authority' }
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+      - name: Verify the audited manifest and run the selected synthetic tests
+        env:
+          MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
+          MYRK_CI_COUNT: ${{ matrix.expected_count }}
+          MYRK_CI_NODE_DIGEST: ${{ matrix.node_digest }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_ACCEPTANCE_GROUP --expected-count $env:MYRK_CI_COUNT --expected-node-digest $env:MYRK_CI_NODE_DIGEST
+          exit $LASTEXITCODE
+
+  integrated-source-controls:
+    name: Acceptance ${{ matrix.group }}
+    if: inputs.focus == 'integrated-source-controls'
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: audited-candidate-controls, expected_count: '15', node_digest: '318a9fb49501c66c1cd414a2d78c3c98ef1fb61af25a8d61af7d2f2e3962b012', node: false}
+          - {group: audited-sdk-reopen, expected_count: '2', node_digest: '33c50a3cfdf9aaec86d9685a1d15d18076ae1c84f8d42b136301613b742aa3fd', node: false}
+          - {group: audited-governance-stop-control, expected_count: '5', node_digest: 'ce8b63d2edada47a3e59d7ee53c497a61a2814469785d49c0aeb1606dfaefbde', node: true}
+          - {group: audited-quality-materials-4, expected_count: '12', node_digest: '4102b5cc21dc34667eef657a4fb4d99e9e48dfbddaa7058290e659f65a64b198', node: false}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Node for the governance driver
+        if: matrix.node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.20.0'
+          architecture: x64
+          package-manager-cache: false
       - name: Install locked Python dependencies and verify the fixed executor
         run: >-
           & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass

@@ -166,6 +166,9 @@ AUDITED_GROUPS = {
     ),
     'audited-local-scoring': GROUPS['synthetic-local-scoring'],
     'audited-judge': GROUPS['judge-fixtures'],
+    'audited-candidate-controls': ('acceptance/test_candidate_refreeze',),
+    'audited-sdk-reopen': ('test_provider_history_reopen',),
+    'audited-governance-stop-control': ('acceptance/test_quality_governance_stop_target',),
     'audited-memory-criteria': ('acceptance/test_review_contract_triggers',),
     'audited-quality-materials-1': ('acceptance/test_quality_materials_human_gate',),
     'audited-quality-materials-2': ('acceptance/test_quality_materials_human_gate',),
@@ -302,6 +305,7 @@ DIAGNOSTIC_CASES = {
     'acceptance/test_actions': ('test_local_effect_branches_keep_real_results[read-denied]',),
 }
 DIAGNOSTIC_XML = 'public-diagnostic.xml'
+AUDITED_DIAGNOSTIC_GROUPS = {'audited-quality-materials-4'}
 
 
 class CheckError(Exception):
@@ -541,9 +545,10 @@ def main():
                 or any(node.startswith(exclusions) for node in expected)):
             raise CheckError('The synthetic case selection differs from the reviewed scope.')
         stage = 'execution'
+        diagnostic = arguments.diagnostic_file or group in AUDITED_DIAGNOSTIC_GROUPS
         diagnostic_options = (
             '--tb=short', '-o', 'junit_family=xunit1', f'--junitxml={DIAGNOSTIC_XML}',
-        ) if arguments.diagnostic_file else ()
+        ) if diagnostic else ()
         status, receipt, cleaned = run_pytest(summary, environment, stage, selection, '--myrk-shard=other',
                                               f'--myrk-shard-manifest={manifest_path}', *deselection, *diagnostic_options)
         observation_path = report_file(receipt, 'observation.json')
@@ -554,7 +559,7 @@ def main():
         totals = Counter(outcomes.values())
         publish(summary, f'- Outcomes: {totals["passed"]} passed, {totals["failed"]} failed, '
                          f'{totals["skipped"]} skipped, {totals["incomplete"]} incomplete, {unexpected} unexpected.')
-        if status and arguments.diagnostic_file:
+        if status and diagnostic:
             publish_test_diagnostic(summary, observation_path.parent.parent / DIAGNOSTIC_XML, paths[0], outcomes)
         for path in paths:
             counts = Counter(outcome for node, outcome in outcomes.items() if node.partition('::')[0] == path)
