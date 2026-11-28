@@ -2,6 +2,10 @@ name: Windows public retained desktop processes
 
 on:
   workflow_call:
+    inputs:
+      criteria_only:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,10 +18,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - {group: retained-desktop-connection, count: '1', digest: ff4e6ce375631504589d82e4651b49ef7fdf3f6754c7aa258a20df91bc01dfbf, index_alias: false}
-          - {group: retained-formal-service-shutdown, count: '3', digest: b588ce91170d1660c78da067f88a6b7c4594937c6f545f8267a4939bc010325d, index_alias: false}
-          - {group: retained-criteria-refreeze, count: '1', digest: 3427919f9faf77d8ed181a7013bdc6ff4bc4b85bc3ee417cc72a252f08fc37f6, index_alias: true}
+        include: >-
+          ${{ fromJSON(inputs.criteria_only &&
+          '[{"group":"retained-criteria-refreeze","count":"1","digest":"3427919f9faf77d8ed181a7013bdc6ff4bc4b85bc3ee417cc72a252f08fc37f6","index_alias":true}]' ||
+          '[{"group":"retained-desktop-connection","count":"1","digest":"ff4e6ce375631504589d82e4651b49ef7fdf3f6754c7aa258a20df91bc01dfbf","index_alias":false},{"group":"retained-formal-service-shutdown","count":"3","digest":"b588ce91170d1660c78da067f88a6b7c4594937c6f545f8267a4939bc010325d","index_alias":false},{"group":"retained-criteria-refreeze","count":"1","digest":"3427919f9faf77d8ed181a7013bdc6ff4bc4b85bc3ee417cc72a252f08fc37f6","index_alias":true}]') }}
     defaults:
       run:
         shell: pwsh

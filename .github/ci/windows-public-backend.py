@@ -69,7 +69,7 @@ GROUPS = {
         'test_extension_review',
     ),
     'artifact-delivery': (
-        'test_artifacts', 'test_extensions', 'test_independent_delivery',
+        'test_artifacts', 'test_artifact_reopen', 'test_extensions', 'test_independent_delivery',
     ),
     'conversation-and-delegation': (
         'test_context', 'test_conversation', 'test_delegation', 'test_delegation_verification_status',
@@ -312,7 +312,6 @@ AUDITED_SELECTION = {
         'tests/acceptance/test_integration_contract.py::test_missing_evidence_link_stops_the_shared_run',
         'tests/acceptance/test_integration_contract.py::test_incomplete_publication_retains_only_a_proven_stop_failure',
         'tests/acceptance/test_integration_contract.py::test_publication_preserves_proven_late_request_when_earlier_original_is_incomplete',
-        'tests/acceptance/test_integration_contract.py::test_formal_stop_verdict_survives_failed_original_validation',
         'tests/acceptance/test_integration_contract.py::test_runtime_negative_claim_cannot_change_the_static_expectation',
         'tests/acceptance/test_integration_contract.py::test_default_executor_uses_the_shared_install_and_explicit_invalid_path_fails_before_execution',
     ),

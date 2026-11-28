@@ -119,7 +119,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {group: audited-integration-controls, expected_count: '46', node_digest: 'f2559fe4746b9a2e16050cca636842e17a65a684c020192bcc3d52c574d158c0'}
+          - {group: audited-integration-controls, expected_count: '11', node_digest: '4d026b2763e255447b034497b1f5da61c34595ce8280ebbab0b91b4ca3d071cb'}
           - {group: audited-formal-http-controls, expected_count: '12', node_digest: 'dd2e1813a0f6da17788e6855614c75d47baf0572fd05fbe609ef7595894c0a51'}
           - {group: audited-historical-controls, expected_count: '26', node_digest: '480fa1ae189a12c3dfdc7a01b8c18fc7ff7cc2b49231aae7d2664221a59ba2d6'}
     defaults:

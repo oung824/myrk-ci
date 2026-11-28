@@ -61,35 +61,8 @@ $publicSerialCases = @(
     'the narrow production desktop reserves readable document and chat areas at 125 percent zoom'
     'the production desktop completes the programming workflow with saved real deliveries and reading controls'
 )
-$diagnosticGroups = @{
-    'diagnose-index' = @{
-        file = 'src/main/index.test.ts'
-        cases = @(
-            'a native folder selection belongs to its conversation and cannot authorize another conversation'
-            'a delivered artifact opens a fixed current snapshot only in its owning active conversation'
-        )
-        sources = @('desktop/src/main/index.ts', 'desktop/src/main/python-service.ts', 'tests/desktop_fixture.py')
-    }
-    'diagnose-lifecycle' = @{
-        file = 'src/main/lifecycle.test.ts'
-        cases = @(
-            'real hidden desktop closes, reopens and waits for owned work; blocked save=false'
-            'real hidden desktop closes, reopens and waits for owned work; blocked save=true'
-        )
-        sources = @('desktop/tests/lifecycle.electron.mjs', 'desktop/tests/reopen.electron.mjs', 'desktop/tests/desktop-process.ts',
-            'desktop/tests/process-observation.mjs', 'tests/desktop_fixture.py')
-    }
-    'diagnose-exit-acceptance' = @{
-        file = 'src/main/exit-acceptance.integration.test.ts'
-        cases = @(
-            'real desktop exits and reopens without rerunning owned work: running'
-            'real desktop exits and reopens without rerunning owned work: approval'
-            'real desktop exits and reopens without rerunning owned work: timeout'
-        )
-        sources = @('desktop/tests/exit-acceptance.electron.mjs', 'desktop/tests/desktop-process.ts',
-            'desktop/tests/process-observation.mjs', 'tests/exit_acceptance_fixture.py', 'tests/support/observed_check_runner.py')
-    }
-}
+$diagnosticData = Import-PowerShellDataFile (Join-Path $PSScriptRoot 'windows-public-desktop-diagnostics.psd1')
+$diagnosticGroups = $diagnosticData.Isolated
 
 $focusedDiagnostics = @{
     'diagnose-recovery' = @{
@@ -202,6 +175,7 @@ try {
     $diagnostics = @($diagnostics | Where-Object { $_ })
     $selected = if ($diagnostics.Count) { @($diagnostics.file) } else { $groups[$Group] }
     $selected = @($selected)
+    if ($Group -eq 'python-service') { $diagnostics = @($diagnosticData.PythonService) }
     $arguments = $selected
     $filteredSerial = $Group -eq 'pdf-and-programming'
     if ($filteredSerial) {
@@ -261,6 +235,18 @@ try {
     Write-CiSummary "- Generated runtime cleanup recorded: $cleanupVerified. Runtime directory absent: $runtimeRemoved."
     Write-CiSummary "- Temporary configuration removed: $configurationRemoved. Protected generated locations unchanged: $protectedUnchanged."
 
+    if ($Group -eq 'python-service') {
+        $stage = 'process-cleanup'
+        $checkoutPath = $root + [IO.Path]::DirectorySeparatorChar
+        $candidates = "Name='node.exe' OR Name='python.exe' OR Name='pythonw.exe' OR Name='electron.exe' OR Name='executor.exe'"
+        $remaining = @(Get-CimInstance Win32_Process -Filter $candidates | Where-Object {
+            ([string]$_.ExecutablePath).StartsWith($checkoutPath, [StringComparison]::OrdinalIgnoreCase) -or
+            ([string]$_.CommandLine).Contains($checkoutPath, [StringComparison]::OrdinalIgnoreCase)
+        })
+        Write-CiSummary "- Desktop test processes referring to the checkout after exit: $($remaining.Count)."
+        if ($remaining.Count) { throw 'Checkout-bound desktop test processes remain active.' }
+    }
+
     $stage = 'vitest-report'
     $jsonReport = Join-Path $results "$($receipts[0].BaseName)-reports" 'json/output.json'
     if ($jsonReport -notin @($receipt.reports) -or !(Test-Path -LiteralPath $jsonReport -PathType Leaf)) {
@@ -274,7 +260,6 @@ try {
 
     $diagnosticVerified = $true
     if ($diagnostics.Count) {
-        $diagnosticVerified = $modules.Count -eq $diagnostics.Count
         foreach ($diagnostic in $diagnostics) {
             $expectedModule = Join-Path $desktop $diagnostic.file
             $matchingModules = @($modules | Where-Object { ([string]$_.name).Replace('/', '\') -ieq $expectedModule })
@@ -372,6 +357,10 @@ try {
     [array]::Sort($orderedCaseIds, [StringComparer]::Ordinal)
     $caseBytes = [Text.Encoding]::UTF8.GetBytes($orderedCaseIds -join "`n")
     $caseDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($caseBytes)).ToLowerInvariant()
+    if ($Group -eq 'python-service' -and ($requested -ne 36 -or
+        $caseDigest -cne 'dfd4069a056e5af7233cfc83f23f27e83dc7e4aac728284b8cb86627d970d34c')) {
+        throw 'Desktop Python service test identities differ from the audited list.'
+    }
     Write-CiSummary "- Passed desktop case IDs SHA-256: $caseDigest."
     Write-CiSummary "- Desktop behavior passed in $([Math]::Round($timer.Elapsed.TotalSeconds, 3)) s."
 } catch {

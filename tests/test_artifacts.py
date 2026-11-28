@@ -13,19 +13,7 @@ from pydantic_ai.providers.deepseek import DeepSeekProvider
 
 from myrk.conversation import Conversation, Task, TaskScope
 from myrk.permissions import ApprovalSettings
-
-
-def reply(tool=None, arguments=None, text='已交付。', call_id='call'):
-    delta = {'role': 'assistant'}
-    if tool:
-        delta['tool_calls'] = [{'index': 0, 'id': call_id, 'type': 'function',
-            'function': {'name': tool, 'arguments': json.dumps(arguments or {})}}]
-    else:
-        delta['content'] = text
-    chunk = {'id': call_id, 'object': 'chat.completion.chunk', 'created': 1, 'model': 'deepseek-flash',
-        'choices': [{'index': 0, 'delta': delta, 'finish_reason': 'tool_calls' if tool else 'stop'}]}
-    return httpx2.Response(200, text=f'data: {json.dumps(chunk)}\n\ndata: [DONE]\n\n',
-        headers={'content-type': 'text/event-stream'})
+from tests.support.artifact_requests import ask_with_transport, reply
 
 
 @pytest.mark.parametrize('delegated', [False, True])
@@ -90,16 +78,6 @@ def test_native_file_is_delivered_explicitly_and_reopens_with_the_same_identity(
     assert Conversation.open(path).turns[-1].artifacts == turn.artifacts
     assert any(event.kind == 'artifacts' and event.artifacts == turn.artifacts for event in events)
     assert all('deliver_files' not in [tool['function']['name'] for tool in request['tools']] for request in sent)
-
-
-async def ask_with_transport(conversation, root, respond, **kwargs):
-    async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
-        async with AsyncOpenAI(api_key='synthetic-only', base_url='https://api.deepseek.com',
-                http_client=http, max_retries=0) as client:
-            return await conversation.ask('处理并明确交付报告。', document=None,
-                scope=TaskScope(root=str(root), allowed_actions=['read', 'edit', 'check'],
-                    provider='deepseek', recipients=['deepseek']),
-                model=OpenAIChatModel('deepseek-flash', provider=DeepSeekProvider(openai_client=client)), **kwargs)
 
 
 @pytest.mark.parametrize('existed', [False, True])
@@ -317,24 +295,6 @@ def test_unverified_or_interrupted_delivery_never_registers_a_reliable_artifact(
         assert conversation.save_failures
 
 
-def test_old_v9_record_is_backed_up_without_inventing_artifacts_from_saved_paths(tmp_path):
-    path = tmp_path / 'conversation.json'
-    original = json.dumps({'version': 9, 'messages': [], 'turns': [{
-        'prompt': '原问题', 'answer': '已写好 E:/报告.txt', 'status': 'failed',
-        'actions': [{'task_id': 'old-task', 'kind': 'create', 'target': 'E:/报告.txt',
-            'status': 'completed', 'effect': 'completed', 'after_sha256': 'a' * 64}]}]}, ensure_ascii=False).encode('utf-8')
-    path.write_bytes(original)
-    conversation = Conversation.open(path)
-    conversation.save()
-    conversation.save()
-    assert not conversation.turns[0].artifacts
-    assert not conversation.turns[0].actions[0].file_changes
-    assert json.loads(path.read_text(encoding='utf-8'))['version'] == 10
-    backups = list((tmp_path / 'backups').glob('conversation-v9-*.json'))
-    assert len(backups) == 1 and backups[0].read_bytes() == original
-    assert not Conversation.open(backups[0]).turns[0].artifacts
-
-
 @pytest.mark.parametrize('behavior', ['read', 'same_content', 'answer_only'])
 def test_reading_unchanged_writes_and_answer_paths_are_not_delivered_files(tmp_path, monkeypatch, behavior):
     root = tmp_path / 'task'
@@ -356,70 +316,3 @@ def test_reading_unchanged_writes_and_answer_paths_are_not_delivered_files(tmp_p
     assert not turn.artifacts and not any(action.file_changes for action in turn.actions)
     assert not Conversation.open(conversation.path).turns[-1].artifacts
     assert (root / 'input.txt').read_text(encoding='utf-8') == '原始全文'
-
-
-def test_sdk_instructions_explain_discovery_before_command_outputs_and_explicit_delivery(tmp_path, monkeypatch):
-    root = tmp_path / 'task'
-    root.mkdir()
-    path = tmp_path / 'records' / 'conversation.json'
-    sent = []
-
-    def respond(request):
-        sent.append(json.loads(request.content))
-        return reply(text='已了解本次文件交付要求。')
-
-    async def scenario():
-        first = await ask_with_transport(Conversation(path), root, respond)
-        reopened = Conversation.open(path)
-        second = await ask_with_transport(reopened, root, respond, task=reopened.turns[-1].task)
-        assert first.status == second.status == 'completed'
-
-    monkeypatch.setattr(models, 'ALLOW_MODEL_REQUESTS', True)
-    asyncio.run(scenario())
-    instructions = '\n'.join(str(message['content']) for message in sent[0]['messages'] if message['role'] == 'system')
-    assert 'run_command_with_outputs' in instructions
-    assert 'search_extensions' in instructions and 'describe_extension' in instructions and 'call_extension' in instructions
-    assert '执行前声明' in instructions and 'deliver_files' in instructions and 'change_ids' in instructions
-    assert all(word in instructions for word in ['读入资料', '备份', '临时文件', '日志', '不能事后'])
-    assert sent[1]['messages'][:len(sent[0]['messages'])] == sent[0]['messages']
-    assert sent[1]['tools'] == sent[0]['tools']
-    assert Conversation.open(path).turns[-1].request_attempts[0].observation.layout_version == 1
-
-
-def test_reopening_history_without_delivery_guidance_appends_it_without_editing_old_messages(tmp_path, monkeypatch):
-    root = tmp_path / 'task'
-    root.mkdir()
-    path = tmp_path / 'records' / 'conversation.json'
-    sent = []
-
-    def respond(request):
-        sent.append(json.loads(request.content))
-        return reply(text='继续原任务。')
-
-    async def scenario():
-        await ask_with_transport(Conversation(path), root, respond)
-        record = json.loads(path.read_text(encoding='utf-8'))
-        removed = 0
-        for message in record['messages']:
-            for part in message['parts']:
-                if part['part_kind'] == 'instruction-baseline':
-                    previous = part['instructions']
-                    part['instructions'] = [block for block in previous if not str(block.get('id', '')).endswith('artifact-delivery')]
-                    removed += len(previous) - len(part['instructions'])
-        assert removed == 1
-        path.write_text(json.dumps(record, ensure_ascii=False), encoding='utf-8')
-        original_messages = record['messages']
-        reopened = Conversation.open(path)
-        turn = await ask_with_transport(reopened, root, respond, task=reopened.turns[-1].task)
-        assert turn.status == 'completed', turn.error
-        saved = json.loads(path.read_text(encoding='utf-8'))
-        assert saved['messages'][:len(original_messages)] == original_messages
-        additions = [part for message in saved['messages'][len(original_messages):] for part in message['parts']]
-        assert any(part['part_kind'] == 'instruction-delta' and 'run_command_with_outputs' in str(part.get('content'))
-            for part in additions)
-        assert turn.request_attempts[0].observation.layout_version == 1
-
-    monkeypatch.setattr(models, 'ALLOW_MODEL_REQUESTS', True)
-    asyncio.run(scenario())
-    assert sent[1]['tools'] == sent[0]['tools']
-    assert 'run_command_with_outputs' in json.dumps(sent[1]['messages'], ensure_ascii=False)

@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope for the offline desktop check
         type: choice
-        options: [all, renderer-and-state, process-workflows, isolated-process-files, recovery-and-approval, electron-remainder]
+        options: [all, python-service, renderer-and-state, process-workflows, isolated-process-files, recovery-and-approval, electron-remainder]
         default: all
 
 permissions:
@@ -22,6 +22,7 @@ jobs:
       matrix:
         group: >-
           ${{ fromJSON(inputs.focus == 'renderer-and-state' && '["renderer-and-state"]' ||
+          inputs.focus == 'python-service' && '["python-service"]' ||
           inputs.focus == 'process-workflows' && '["electron-workflows","python-service","diagnose-index","diagnose-lifecycle","diagnose-exit-acceptance"]' ||
           inputs.focus == 'recovery-and-approval' && '["diagnose-recovery","diagnose-approval-modes"]' ||
           inputs.focus == 'electron-remainder' && '["electron-remainder"]' ||
