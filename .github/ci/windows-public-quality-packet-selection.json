@@ -1,0 +1,26 @@
+{
+  "quality-packet-summary": [
+    "tests/acceptance/test_quality_correction_observation.py::test_saved_summary_is_published_before_correction_without_blocking_further_saves",
+    "tests/acceptance/test_quality_correction_observation.py::test_summary_observation_rejects_conflicting_saved_evidence_without_publishing[request-SDK request identity]",
+    "tests/acceptance/test_quality_correction_observation.py::test_summary_observation_rejects_conflicting_saved_evidence_without_publishing[owner-owner or saved request order]",
+    "tests/acceptance/test_quality_correction_observation.py::test_summary_observation_rejects_conflicting_saved_evidence_without_publishing[summary_order-owner or saved request order]",
+    "tests/acceptance/test_quality_correction_observation.py::test_summary_observation_rejects_conflicting_saved_evidence_without_publishing[existing_source-target already exists]"
+  ],
+  "quality-packet-denials-and-uncertainty": [
+    "tests/acceptance/test_quality_answer_isolation.py::test_manifest_rejects_removed_evaluator_copy_denial",
+    "tests/acceptance/test_quality_evidence_uncertainty.py::test_qg6_never_started_read_only_task_does_not_vacuously_pass_critical_scope",
+    "tests/acceptance/test_quality_packet_authority.py::test_runtime_permission_record_cannot_remove_canonical_review_denials"
+  ],
+  "quality-packet-memory-budget": [
+    "tests/acceptance/test_memory_review_request_budget.py::test_one_bounded_review_can_list_then_add_then_finish_with_three_native_requests[QG4.formal.4]",
+    "tests/acceptance/test_memory_review_request_budget.py::test_one_bounded_review_can_list_then_add_then_finish_with_three_native_requests[QG4.tuning.2]",
+    "tests/acceptance/test_memory_review_request_budget.py::test_one_operation_accepts_two_or_four_review_requests_within_its_actual_task_cap[0]",
+    "tests/acceptance/test_memory_review_request_budget.py::test_one_operation_accepts_two_or_four_review_requests_within_its_actual_task_cap[2]",
+    "tests/acceptance/test_memory_review_request_budget.py::test_review_shares_main_requests_and_cannot_finish_after_the_saved_cap",
+    "tests/acceptance/test_memory_review_request_budget.py::test_missing_request_observations_stay_unknown_and_counterevidence_wins",
+    "tests/acceptance/test_memory_review_request_budget.py::test_second_actual_review_operation_and_extra_fact_are_rejected",
+    "tests/acceptance/test_memory_review_request_budget.py::test_public_stop_during_review_retains_the_actual_cap_and_starts_no_following_request",
+    "tests/acceptance/test_memory_review_request_budget.py::test_project_review_cannot_save_its_fact_into_personal_memory",
+    "tests/acceptance/test_memory_review_request_budget.py::test_recoverable_review_retry_consumes_the_original_cap_without_becoming_a_second_operation"
+  ]
+}

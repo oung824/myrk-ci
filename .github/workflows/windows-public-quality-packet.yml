@@ -1,0 +1,47 @@
+name: Windows public quality packet behavior
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  behavior:
+    name: Quality packet / ${{ matrix.group }}
+    runs-on: windows-11-arm
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [quality-packet-summary, quality-packet-denials-and-uncertainty, quality-packet-memory-budget]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the published sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select the validated x64 Node release for Electron
+        if: matrix.group == 'quality-packet-summary'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.20.0'
+          architecture: x64
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Install locked desktop dependencies and verify Electron
+        if: matrix.group == 'quality-packet-summary'
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check desktop-contracts
+      - name: Verify exact behavior, collection, and process cleanup
+        env:
+          MYRK_CI_GROUP: ${{ matrix.group }}
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-public-quality-packet.ps1 -Group $env:MYRK_CI_GROUP

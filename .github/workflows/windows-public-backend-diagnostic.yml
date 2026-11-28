@@ -6,7 +6,7 @@ on:
       focus:
         description: Run the four reproduced cases, full files, or integrated runner checks
         type: choice
-        options: [cases, files, integrated, artifact, auxiliary, file-behavior, isolated-formal, source-only-controls, synthetic-material-parity, synthetic-child-rows, registry-parity]
+        options: [cases, files, integrated, artifact, auxiliary, file-behavior, isolated-formal, source-only-controls, synthetic-material-parity, synthetic-child-rows, registry-parity, quality-packet-behavior]
         default: cases
 
 permissions:
@@ -347,3 +347,7 @@ jobs:
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-registry-parity.py' $env:MYRK_CI_REGISTRY_PARITY
           exit $LASTEXITCODE
+
+  quality-packet-behavior:
+    if: inputs.focus == 'quality-packet-behavior'
+    uses: ./.github/workflows/windows-public-quality-packet.yml
