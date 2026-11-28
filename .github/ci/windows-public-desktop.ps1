@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory)]
     [ValidateSet('electron-workflows', 'python-service', 'renderer-and-state', 'pdf-and-programming',
-        'diagnose-index', 'diagnose-lifecycle', 'diagnose-exit-acceptance')]
+        'diagnose-index', 'diagnose-lifecycle', 'diagnose-exit-acceptance', 'diagnose-recovery', 'diagnose-approval-modes')]
     [string]$Group
 )
 
@@ -91,6 +91,21 @@ $diagnosticGroups = @{
     }
 }
 
+$focusedDiagnostics = @{
+    'diagnose-recovery' = @{
+        file = 'src/main/recovery.integration.test.ts'
+        cases = @('the same hidden desktop verifies an accidental crash then exits normally and reopens')
+        sources = @('desktop/tests/recovery.electron.mjs', 'desktop/tests/desktop-process.ts',
+            'desktop/tests/process-observation.mjs', 'tests/recovery_fixture.py')
+    }
+    'diagnose-approval-modes' = @{
+        file = 'src/main/approval-modes.integration.test.ts'
+        cases = @('real desktop runs three approval modes, preserves trust and confirms stop and reopen effects')
+        sources = @('desktop/tests/approval-modes.electron.mjs', 'desktop/tests/desktop-process.ts',
+            'desktop/tests/process-observation.mjs', 'tests/approval_desktop_fixture.py')
+    }
+}
+
 function Write-DesktopDiagnostic($Diagnostic, $Module, [string]$Root) {
     $publishedTest = "desktop/$($Diagnostic.file)"
     $lineLimits = @{}
@@ -156,7 +171,7 @@ try {
     if (($inventory -join "`n") -cne (($assigned | Sort-Object) -join "`n")) {
         throw 'Desktop file assignments differ from the test inventory.'
     }
-    $diagnostic = $diagnosticGroups[$Group]
+    $diagnostic = $diagnosticGroups[$Group] ?? $focusedDiagnostics[$Group]
     $selected = if ($diagnostic) { @($diagnostic.file) } else { $groups[$Group] }
     $selected = @($selected)
     $arguments = $selected
