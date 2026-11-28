@@ -6,7 +6,7 @@ on:
       focus:
         description: Run both synthetic checks or diagnose only the native SDK case
         type: choice
-        options: [all, native, synthetic-artifacts, quality-recovery]
+        options: [all, native, synthetic-artifacts, quality-recovery, split-ordinary]
         default: all
 
 permissions:
@@ -132,4 +132,38 @@ jobs:
           MYRK_DIGEST: ${{ matrix.digest }}
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-quality-recovery.py' $env:MYRK_GROUP $env:MYRK_COUNT $env:MYRK_DIGEST
+          exit $LASTEXITCODE
+
+  split-ordinary:
+    name: Behavior ${{ matrix.group }}
+    if: inputs.focus == 'split-ordinary'
+    runs-on: windows-11-arm
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [split-ordinary-1, split-ordinary-2, split-ordinary-3, split-ordinary-4]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the published sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the locked Python runtime and executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Create a synthetic report index
+        run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'A new synthetic history is required' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+      - name: Run unchanged assertions with the ordinary registry fixture
+        env:
+          MYRK_BEHAVIOR_GROUP: ${{ matrix.group }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-split-behavior.py' $env:MYRK_BEHAVIOR_GROUP
           exit $LASTEXITCODE

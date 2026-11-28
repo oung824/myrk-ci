@@ -1,0 +1,97 @@
+{
+  "split-ordinary-1": {
+    "node_ids": [
+      "tests/acceptance/test_question_review.py::test_long_result_keeps_required_structure_and_byte_facts[missing-line]",
+      "tests/acceptance/test_question_review.py::test_long_result_keeps_required_structure_and_byte_facts[wrong-encoding]",
+      "tests/acceptance/test_question_review.py::test_long_result_keeps_required_structure_and_byte_facts[no-bom]",
+      "tests/acceptance/test_question_review.py::test_long_result_keeps_required_structure_and_byte_facts[lf-only]",
+      "tests/acceptance/test_question_review.py::test_long_result_keeps_required_structure_and_byte_facts[wrong-byte-prefix]",
+      "tests/acceptance/test_question_review.py::test_long_result_keeps_required_structure_and_byte_facts[missing-citation]",
+      "tests/acceptance/test_question_review.py::test_long_result_keeps_required_structure_and_byte_facts[short-body]",
+      "tests/acceptance/test_question_review.py::test_long_result_keeps_required_structure_and_byte_facts[missing-ending]",
+      "tests/acceptance/test_question_review.py::test_long_stream_interruption_keeps_partial_output_and_failure[deepseek]",
+      "tests/acceptance/test_question_review.py::test_long_stream_interruption_keeps_partial_output_and_failure[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_long_stream_interruption_keeps_partial_output_and_failure[google]",
+      "tests/acceptance/test_question_review.py::test_a_number_mention_without_a_clear_assertion_remains_pending[deepseek]",
+      "tests/acceptance/test_question_review.py::test_a_number_mention_without_a_clear_assertion_remains_pending[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_a_number_mention_without_a_clear_assertion_remains_pending[google]",
+      "tests/acceptance/test_question_review.py::test_case_review_leaves_critical_status_unknown_without_its_source_output",
+      "tests/acceptance/test_question_review.py::test_catalogue_freezes_screening_caps_before_any_execution",
+      "tests/acceptance/test_question_review.py::test_import_rejects_two_different_decisions_with_the_same_id",
+      "tests/acceptance/test_question_review.py::test_reexport_keeps_the_final_failure_and_its_original_history"
+    ],
+    "count": 18,
+    "node_ids_sha256": "1e427ebe538a0a98e7c13dd447274124f8b749ab577895a74a30081c7e4e3bf5"
+  },
+  "split-ordinary-2": {
+    "node_ids": [
+      "tests/acceptance/test_question_review.py::test_native_response_view_drives_output_units_after_real_sdk_decoding[identity-deepseek]",
+      "tests/acceptance/test_question_review.py::test_native_response_view_drives_output_units_after_real_sdk_decoding[identity-openai-chat]",
+      "tests/acceptance/test_question_review.py::test_native_response_view_drives_output_units_after_real_sdk_decoding[identity-google]",
+      "tests/acceptance/test_question_review.py::test_native_response_view_drives_output_units_after_real_sdk_decoding[gzip-deepseek]",
+      "tests/acceptance/test_question_review.py::test_native_response_view_drives_output_units_after_real_sdk_decoding[gzip-openai-chat]",
+      "tests/acceptance/test_question_review.py::test_native_response_view_drives_output_units_after_real_sdk_decoding[gzip-google]",
+      "tests/acceptance/test_question_review.py::test_encoded_long_answer_keeps_original_bytes_and_complete_response[deepseek]",
+      "tests/acceptance/test_question_review.py::test_encoded_long_answer_keeps_original_bytes_and_complete_response[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_encoded_long_answer_keeps_original_bytes_and_complete_response[google]",
+      "tests/acceptance/test_question_review.py::test_question_explicit_denial_is_not_a_pass[deepseek]",
+      "tests/acceptance/test_question_review.py::test_question_explicit_denial_is_not_a_pass[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_question_explicit_denial_is_not_a_pass[google]",
+      "tests/acceptance/test_question_review.py::test_long_answer_accepts_equivalent_encoding_wording[deepseek]",
+      "tests/acceptance/test_question_review.py::test_long_answer_accepts_equivalent_encoding_wording[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_long_answer_accepts_equivalent_encoding_wording[google]",
+      "tests/acceptance/test_question_review.py::test_final_reviewer_resolves_disagreement_without_hiding_later_reviews",
+      "tests/acceptance/test_question_review.py::test_new_standard_keeps_old_package_and_rejects_false_not_applicable",
+      "tests/acceptance/test_question_review.py::test_result_save_rejects_repeated_case_protocol_before_coverage_can_overwrite"
+    ],
+    "count": 18,
+    "node_ids_sha256": "5b3dfe874b4aa34ac1c0dadb7a724dd1267fbf918c5bb314aaffa7abf6b04c10"
+  },
+  "split-ordinary-3": {
+    "node_ids": [
+      "tests/acceptance/test_question_review.py::test_named_review_closes_only_semantic_uncertainty_with_complete_program_facts[reviewable]",
+      "tests/acceptance/test_question_review.py::test_named_review_closes_only_semantic_uncertainty_with_complete_program_facts[fixed-fixture]",
+      "tests/acceptance/test_question_review.py::test_named_review_closes_only_semantic_uncertainty_with_complete_program_facts[program-unmeasured]",
+      "tests/acceptance/test_question_review.py::test_named_review_closes_only_semantic_uncertainty_with_complete_program_facts[program-failed]",
+      "tests/acceptance/test_question_review.py::test_named_review_closes_only_semantic_uncertainty_with_complete_program_facts[critical-unknown]",
+      "tests/acceptance/test_question_review.py::test_named_review_closes_only_semantic_uncertainty_with_complete_program_facts[incomplete-evidence]",
+      "tests/acceptance/test_question_review.py::test_review_export_import_preserves_originals_and_old_decisions[deepseek]",
+      "tests/acceptance/test_question_review.py::test_review_export_import_preserves_originals_and_old_decisions[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_review_export_import_preserves_originals_and_old_decisions[google]",
+      "tests/acceptance/test_question_review.py::test_attachment_explicit_denial_does_not_override_actual_source[deepseek]",
+      "tests/acceptance/test_question_review.py::test_attachment_explicit_denial_does_not_override_actual_source[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_attachment_explicit_denial_does_not_override_actual_source[google]",
+      "tests/acceptance/test_question_review.py::test_complex_quoted_claims_require_review_without_false_failure[ordinary.question-The result is 42. The earlier claim \"six times seven is not 42\" is wrong.]",
+      "tests/acceptance/test_question_review.py::test_complex_quoted_claims_require_review_without_false_failure[ordinary.question-The result is 42. \"6 + 7 = 42\" is an example of an incorrect equation.]",
+      "tests/acceptance/test_question_review.py::test_complex_quoted_claims_require_review_without_false_failure[ordinary.attachment-The threshold is 800. The old claim \"threshold is not 800\" is incorrect. [purchase.md:1]]",
+      "tests/acceptance/test_question_review.py::test_review_cli_exports_the_same_pending_originals",
+      "tests/acceptance/test_question_review.py::test_one_import_cannot_contain_two_final_resolutions",
+      "tests/acceptance/test_question_review.py::test_long_result_allows_equivalent_numbering_body_and_valid_source_line"
+    ],
+    "count": 18,
+    "node_ids_sha256": "f841d5ba1b72643368b63ed02de6519c74461b09a4bf333abe5138ee7ad03a41"
+  },
+  "split-ordinary-4": {
+    "node_ids": [
+      "tests/acceptance/test_question_review.py::test_wrong_fact_is_a_product_failure_even_when_transport_and_evidence_work[deepseek]",
+      "tests/acceptance/test_question_review.py::test_wrong_fact_is_a_product_failure_even_when_transport_and_evidence_work[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_wrong_fact_is_a_product_failure_even_when_transport_and_evidence_work[google]",
+      "tests/acceptance/test_question_review.py::test_attachment_has_actual_read_only_approval_and_source_binding[deepseek]",
+      "tests/acceptance/test_question_review.py::test_attachment_has_actual_read_only_approval_and_source_binding[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_attachment_has_actual_read_only_approval_and_source_binding[google]",
+      "tests/acceptance/test_question_review.py::test_correct_facts_and_recovered_transport_still_need_content_review[deepseek]",
+      "tests/acceptance/test_question_review.py::test_correct_facts_and_recovered_transport_still_need_content_review[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_correct_facts_and_recovered_transport_still_need_content_review[google]",
+      "tests/acceptance/test_question_review.py::test_wrong_equation_is_not_saved_by_the_correct_number[deepseek]",
+      "tests/acceptance/test_question_review.py::test_wrong_equation_is_not_saved_by_the_correct_number[openai-chat]",
+      "tests/acceptance/test_question_review.py::test_wrong_equation_is_not_saved_by_the_correct_number[google]",
+      "tests/acceptance/test_question_review.py::test_export_rejects_unsupported_repeated_execution_shapes_before_writing[case-protocol]",
+      "tests/acceptance/test_question_review.py::test_export_rejects_unsupported_repeated_execution_shapes_before_writing[execution-id]",
+      "tests/acceptance/test_question_review.py::test_review_cannot_pass_unknown_missing_evidence_or_ai_authorship",
+      "tests/acceptance/test_question_review.py::test_export_rejects_an_original_changed_after_the_run",
+      "tests/acceptance/test_question_review.py::test_uncontested_failure_is_not_hidden_by_an_unknown_dimension"
+    ],
+    "count": 17,
+    "node_ids_sha256": "d1ce555ecddb36e6dae072427cc8b63ddcb4a22407517b5fe2fa6839f2913d10"
+  }
+}
