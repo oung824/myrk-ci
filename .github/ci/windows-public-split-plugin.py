@@ -34,8 +34,10 @@ def ordinary_registry_fixture(request, monkeypatch):
         return registry
 
     if request.node.nodeid == "tests/acceptance/test_selected.py::test_selected_plan":
-        from tests.acceptance import conftest
-
+        path = request.node.path.with_name("conftest.py").resolve()
+        conftest = request.config.pluginmanager.get_plugin(str(path))
+        if conftest is None:
+            pytest.fail("The acceptance conftest was not loaded.", pytrace=False)
         monkeypatch.setattr(conftest, "builtin_registry", make_registry)
     else:
         monkeypatch.setattr(request.module, "builtin_registry", make_registry)
