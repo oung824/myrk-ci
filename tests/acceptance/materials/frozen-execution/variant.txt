@@ -1,0 +1,1 @@
+Find the product of 6 and 7 and save the answer.

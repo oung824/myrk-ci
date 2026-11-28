@@ -2,6 +2,12 @@ name: Windows public offline backend
 
 on:
   workflow_dispatch:
+    inputs:
+      focus:
+        description: Scope of the public backend run
+        type: choice
+        options: [standard, frozen-synthetic]
+        default: standard
 
 permissions:
   contents: read
@@ -9,6 +15,7 @@ permissions:
 jobs:
   backend:
     name: Backend ${{ matrix.group }}
+    if: inputs.focus != 'frozen-synthetic'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
@@ -40,3 +47,44 @@ jobs:
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_GROUP
           exit $LASTEXITCODE
+
+  frozen-synthetic:
+    name: Frozen synthetic / ${{ matrix.group }}
+    if: inputs.focus == 'frozen-synthetic'
+    runs-on: windows-11-arm
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: frozen-bindings, count: '22', digest: '34bab8de1c5edddac567d431e64b6adc874b8bb71a9cb7b4485d075f36060a29', index_alias: true, sampler: false}
+          - {group: frozen-budget, count: '13', digest: '2cec51a308820e8aaca1ea99d36e15c4bf5f59d8740b02411cac8794e957b61e', index_alias: true, sampler: false}
+          - {group: frozen-controls, count: '7', digest: '9f4a1d7a83bc7316d1622ff3563b4c81e95bd079f68e6802ebbb5fa7ed6b882e', index_alias: true, sampler: false}
+          - {group: frozen-candidate-compatibility, count: '2', digest: 'c1a686ba27e7f05a8c03414a87cd6630ef89074b52edb331172c39dae2618500', index_alias: false, sampler: false}
+          - {group: frozen-candidate-cancellation, count: '1', digest: '461b5dc9604eca266f3844c49bb95aba41190128ef6dca29929e18bc5ccafa77', index_alias: false, sampler: false}
+          - {group: frozen-authority, count: '9', digest: '4a1bc863675057fb932cc7e822fdbc17bc0e4f9ed0c6b8f8352981341e3b8f93', index_alias: true, sampler: false}
+          - {group: judge-sampling, count: '10', digest: '623fd2b8f67da281b3efcb0b0310cd9a5c58575d000a6ef20bc4246a614be230', index_alias: true, sampler: true}
+          - {group: judge-native-guards, count: '7', digest: 'ba40091f8264a0a7e31ca6221e7a5f89938b542fc7421c4e56e684446a7c92e3', index_alias: true, sampler: false}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Verify exact collection, execution and recovery
+        env:
+          MYRK_CI_GROUP: ${{ matrix.group }}
+          MYRK_CI_COUNT: ${{ matrix.count }}
+          MYRK_CI_DIGEST: ${{ matrix.digest }}
+          MYRK_CI_INDEX_ALIAS: ${{ matrix.index_alias }}
+          MYRK_CI_SAMPLER: ${{ matrix.sampler }}
+        run: >-
+          & './.github/ci/windows-public-frozen.ps1'
+          -Group $env:MYRK_CI_GROUP -NodeCount $env:MYRK_CI_COUNT -NodeDigest $env:MYRK_CI_DIGEST
+          -UseIndexAlias:($env:MYRK_CI_INDEX_ALIAS -eq 'true') -UseSamplingPython:($env:MYRK_CI_SAMPLER -eq 'true')

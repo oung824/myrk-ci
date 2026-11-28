@@ -1,0 +1,1 @@
+{"version":"synthetic-multiplication-v1","goal":"42","allowed_effect":"answer.txt only","equivalence":"Both inputs request the product of six and seven with the same permitted file effect","provenance":"fixed_fixture; no actual semantic or human qualification"}
