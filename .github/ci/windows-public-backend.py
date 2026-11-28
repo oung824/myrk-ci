@@ -166,6 +166,7 @@ AUDITED_GROUPS = {
     ),
     'audited-local-scoring': GROUPS['synthetic-local-scoring'],
     'audited-judge': GROUPS['judge-fixtures'],
+    'audited-packet-stage-retry': ('acceptance/test_quality_packet_integration',),
     'audited-queue-controls': ('acceptance/test_queue_parallel_stop',),
     'audited-request-cost-controls': ('acceptance/test_request_cost_gate',),
     'audited-outcome-controls': (
@@ -210,6 +211,7 @@ AUDITED_DESELECT = {
     'audited-compaction-fixtures': DESELECT['synthetic-compaction'],
 }
 AUDITED_SELECTION = {
+    'audited-packet-stage-retry': ('tests/acceptance/test_quality_packet_integration.py::test_stage_selection_keeps_original_denominator_and_does_not_run_unselected_tasks',),
     'audited-queue-controls': (
         'tests/acceptance/test_queue_parallel_stop.py::test_public_supplement_retries_and_revocation_before_a_final_reply',
         'tests/acceptance/test_queue_parallel_stop.py::test_public_unselected_supplement_can_be_revoked_after_stop_and_reopen',
@@ -343,7 +345,7 @@ DIAGNOSTIC_CASES = {
     'acceptance/test_actions': ('test_local_effect_branches_keep_real_results[read-denied]',),
 }
 DIAGNOSTIC_XML = 'public-diagnostic.xml'
-AUDITED_DIAGNOSTIC_GROUPS = {'audited-quality-materials-4'}
+AUDITED_DIAGNOSTIC_GROUPS = {'audited-quality-materials-4', 'audited-packet-stage-retry'}
 
 
 class CheckError(Exception):
