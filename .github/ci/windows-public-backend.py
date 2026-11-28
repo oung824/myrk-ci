@@ -166,12 +166,19 @@ AUDITED_GROUPS = {
     ),
     'audited-local-scoring': GROUPS['synthetic-local-scoring'],
     'audited-judge': GROUPS['judge-fixtures'],
+    'audited-integration-controls': ('acceptance/test_integration_contract',),
+    'audited-formal-http-controls': ('acceptance/test_formal_http_binding',),
+    'audited-historical-controls': ('acceptance/test_historical_reuse_regrading',),
     'audited-delegation-fixtures': ('acceptance/test_delegation',),
     'audited-compaction-fixtures': ('acceptance/test_compaction',),
     'audited-native-fixtures': ('acceptance/test_native_stream_close', 'acceptance/test_runtime_diagnostics', 'acceptance/test_legacy_reasoning_off', 'acceptance/test_reply_stream_lifecycle'),
     'audited-review-fixtures': ('acceptance/test_action_failure_matching', 'acceptance/test_question_review', 'acceptance/test_files_calculation_checks', 'acceptance/test_review_refactor_behavior', 'acceptance/test_review_contract_triggers'),
 }
 AUDITED_DESELECT = {
+    'audited-historical-controls': (
+        'tests/acceptance/test_historical_reuse_regrading.py::test_builtin_run_and_cli_report_keep_historical_groups_separate',
+        'tests/acceptance/test_historical_reuse_regrading.py::test_current_material_use_proof_is_separate_from_legacy_as_of',
+    ),
     'audited-synthetic-qualification': (
         DESELECT['synthetic-judge-qualification'] + DESELECT['synthetic-trust-and-memory']
         + DESELECT['synthetic-review-and-cancellation']
@@ -181,6 +188,14 @@ AUDITED_DESELECT = {
     'audited-compaction-fixtures': DESELECT['synthetic-compaction'],
 }
 AUDITED_SELECTION = {
+    'audited-integration-controls': (
+        'tests/acceptance/test_integration_contract.py::test_missing_evidence_link_stops_the_shared_run',
+        'tests/acceptance/test_integration_contract.py::test_incomplete_publication_retains_only_a_proven_stop_failure',
+        'tests/acceptance/test_integration_contract.py::test_publication_preserves_proven_late_request_when_earlier_original_is_incomplete',
+        'tests/acceptance/test_integration_contract.py::test_formal_stop_verdict_survives_failed_original_validation',
+        'tests/acceptance/test_integration_contract.py::test_runtime_negative_claim_cannot_change_the_static_expectation',
+        'tests/acceptance/test_integration_contract.py::test_default_executor_uses_the_shared_install_and_explicit_invalid_path_fails_before_execution',
+    ),
     'audited-native-fixtures': (
         'tests/acceptance/test_native_stream_close.py',
         'tests/acceptance/test_runtime_diagnostics.py',

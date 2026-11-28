@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the synthetic acceptance run
         type: choice
-        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures]
+        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures, integrated-synthetic-controls]
         default: all
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   acceptance:
     name: Acceptance ${{ matrix.group }}
-    if: inputs.focus != 'integrated-fixtures'
+    if: inputs.focus != 'integrated-fixtures' && inputs.focus != 'integrated-synthetic-controls'
     runs-on: windows-11-arm
     timeout-minutes: 20
     strategy:
@@ -99,6 +99,45 @@ jobs:
             if (Test-Path -LiteralPath $compaction) { throw 'Synthetic compaction must use a new file' }
             Set-Content -LiteralPath $compaction -Value '{}' -Encoding utf8NoBOM -ErrorAction Stop
           }
+      - name: Verify the audited manifest and run the selected synthetic tests
+        env:
+          MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
+          MYRK_CI_COUNT: ${{ matrix.expected_count }}
+          MYRK_CI_NODE_DIGEST: ${{ matrix.node_digest }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_ACCEPTANCE_GROUP --expected-count $env:MYRK_CI_COUNT --expected-node-digest $env:MYRK_CI_NODE_DIGEST
+          exit $LASTEXITCODE
+
+  integrated-synthetic-controls:
+    name: Acceptance ${{ matrix.group }}
+    if: inputs.focus == 'integrated-synthetic-controls'
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: audited-integration-controls, expected_count: '46', node_digest: 'f2559fe4746b9a2e16050cca636842e17a65a684c020192bcc3d52c574d158c0'}
+          - {group: audited-formal-http-controls, expected_count: '12', node_digest: 'dd2e1813a0f6da17788e6855614c75d47baf0572fd05fbe609ef7595894c0a51'}
+          - {group: audited-historical-controls, expected_count: '26', node_digest: '480fa1ae189a12c3dfdc7a01b8c18fc7ff7cc2b49231aae7d2664221a59ba2d6'}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Prepare the synthetic report index
+        run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
       - name: Verify the audited manifest and run the selected synthetic tests
         env:
           MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
