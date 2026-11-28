@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the public backend run
         type: choice
-        options: [standard, frozen-synthetic, frozen-history-retry, retained-synthetic, retained-materials]
+        options: [standard, frozen-synthetic, frozen-history-retry, retained-synthetic, retained-materials, retained-children]
         default: standard
 
 permissions:
@@ -50,14 +50,16 @@ jobs:
 
   frozen-synthetic:
     name: Frozen synthetic / ${{ matrix.group }}
-    if: inputs.focus == 'frozen-synthetic' || inputs.focus == 'frozen-history-retry' || inputs.focus == 'retained-synthetic' || inputs.focus == 'retained-materials'
+    if: inputs.focus == 'frozen-synthetic' || inputs.focus == 'frozen-history-retry' || inputs.focus == 'retained-synthetic' || inputs.focus == 'retained-materials' || inputs.focus == 'retained-children'
     runs-on: windows-11-arm
     timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         include: >-
-          ${{ fromJSON(inputs.focus == 'retained-materials' &&
+          ${{ fromJSON(inputs.focus == 'retained-children' &&
+          '[{"group":"retained-mixed-output","count":"3","digest":"25b28fe049a23b7371dfd374d2086ffd88b0db8fe5b698e89735465c881841b9","index_alias":false,"sampler":false},{"group":"retained-ordinary-child","count":"2","digest":"9843751256d8bb8f6408187307baea18905805f8702795d46bc12bf4e3ad0e9d","index_alias":false,"sampler":false},{"group":"retained-ordinary-guards","count":"2","digest":"24546dd2d47c81f095e74c944f7fd13b87fc2b4fa509198391479d4193e3f1b9","index_alias":false,"sampler":false},{"group":"retained-criteria-refreeze","count":"1","digest":"3427919f9faf77d8ed181a7013bdc6ff4bc4b85bc3ee417cc72a252f08fc37f6","index_alias":true,"sampler":false}]' ||
+          inputs.focus == 'retained-materials' &&
           '[{"group":"retained-native-compaction","count":"1","digest":"d608f305c7d4dfcc8a22f55fc9d64055415810f1c6566dad9083e3d2f324c185","index_alias":false,"sampler":false},{"group":"retained-role-cost","count":"3","digest":"09d65cefe9b46b6c9df0c4724c1e5722a372c8027bde0c8c9fd04e72f88818b1","index_alias":false,"sampler":false},{"group":"retained-judge-criteria","count":"4","digest":"185b032dc60205a7b92e467d4b6e4e3bdbde5ed3bea527867952a2f10b403a02","index_alias":false,"sampler":false},{"group":"retained-synthetic-queue","count":"5","digest":"a28167aabc6a358e51fa2715237fe01cef83594eb767d976e4712ff0e091ecdd","index_alias":false,"sampler":false},{"group":"retained-legacy-ledger","count":"1","digest":"9803c65b43a33b5eec96888d7ede6448b1f253c9bf98ce920ec2435d85611b9a","index_alias":false,"sampler":false},{"group":"retained-criteria-refreeze","count":"1","digest":"3427919f9faf77d8ed181a7013bdc6ff4bc4b85bc3ee417cc72a252f08fc37f6","index_alias":true,"sampler":false}]' ||
           inputs.focus == 'retained-synthetic' &&
           '[{"group":"retained-judge-provenance","count":"6","digest":"98014ada90b5b0b648c326d30f2c23795232e036c9d4fbd2d7a0565fd9fab1ac","index_alias":true,"sampler":true},{"group":"retained-report-controls","count":"3","digest":"04e9eeaf7d653cd9b53948a5add7164d6371787848f87fcd53ac61e673fcadce","index_alias":false,"sampler":false}]' ||
@@ -82,6 +84,11 @@ jobs:
           if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
           New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
           Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index -ErrorAction Stop
+      - name: Prepare ordinary collection metadata for the guard checks
+        if: matrix.group == 'retained-ordinary-guards'
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-seed-ordinary-protocols.py'
+          exit $LASTEXITCODE
       - name: Verify exact collection, execution and recovery
         env:
           MYRK_CI_GROUP: ${{ matrix.group }}

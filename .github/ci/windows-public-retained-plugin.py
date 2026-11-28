@@ -1,5 +1,7 @@
 """Register the production handlers used by selected synthetic tests."""
 
+import os
+
 import pytest
 
 
@@ -11,6 +13,27 @@ def retained_synthetic_registry(request, monkeypatch):
         from tests.support.agent_acceptance import ordinary
 
         modules = (ordinary,)
+    elif filename in ("test_preparation.py", "test_integration_contract.py", "test_formal_scenarios.py",
+                      "test_formal_qualification_cancel.py"):
+        from tests.support.agent_acceptance import ordinary
+
+        modules = (ordinary,)
+        if node in (
+            "test_prepared_root_is_frozen_at_its_final_location_and_reopens_in_new_process",
+            "test_fresh_execute_cannot_compete_with_the_existing_send_owner",
+        ):
+            source = request.config.rootpath
+            startup = request.getfixturevalue("tmp_path") / "ordinary-child-startup"
+            startup.mkdir()
+            hook = source / ".github/ci/windows-public-ordinary-child.py"
+            (startup / "sitecustomize.py").write_bytes(hook.read_bytes())
+            inherited = os.environ.get("PYTHONPATH")
+            paths = (str(startup), str(source), inherited) if inherited else (str(startup), str(source))
+            monkeypatch.setenv("PYTHONPATH", os.pathsep.join(paths))
+    elif filename == "test_question_review.py":
+        from tests.support.agent_acceptance import compaction, delegation, memory, ordinary, review_cases
+
+        modules = (ordinary, delegation, review_cases, memory, compaction)
     elif filename == "test_save_import_recovery.py":
         from tests.support.agent_acceptance import actions, resume_queue
 
@@ -52,3 +75,33 @@ def retained_synthetic_registry(request, monkeypatch):
     monkeypatch.setattr(agent_acceptance, "builtin_registry", registry_for_test)
     if hasattr(request.module, "builtin_registry"):
         monkeypatch.setattr(request.module, "builtin_registry", registry_for_test)
+
+
+@pytest.fixture(autouse=True)
+def retained_refreeze_usage_authority(request):
+    if request.node.nodeid != (
+        "tests/acceptance/test_candidate_refreeze_compatibility.py::"
+        "test_reviewed_new_criteria_packet_preserves_tasks_and_parent"
+    ):
+        yield
+        return
+
+    from tests.support.agent_acceptance.quality import initialize_quality_usage_authority
+
+    authority = initialize_quality_usage_authority()
+    directory = authority.parent
+    try:
+        yield
+    finally:
+        assert directory.parent.name == ".scratch"
+        assert directory.name == "quality-material-usage"
+        assert not directory.is_symlink() and not directory.is_junction()
+        for name in ("records", "evidence"):
+            member = directory / name
+            assert not member.is_symlink() and not member.is_junction()
+            member.rmdir()
+        for name in ("authority.json", "index.json"):
+            member = directory / name
+            assert member.is_file() and not member.is_symlink()
+            member.unlink()
+        directory.rmdir()

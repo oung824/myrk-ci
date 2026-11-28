@@ -25,5 +25,18 @@
   ],
   "retained-criteria-refreeze": [
     "tests/acceptance/test_candidate_refreeze_compatibility.py::test_reviewed_new_criteria_packet_preserves_tasks_and_parent"
+  ],
+  "retained-mixed-output": [
+    "tests/acceptance/test_question_review.py::test_five_output_types_use_actual_sources_and_keep_domain_criteria[deepseek]",
+    "tests/acceptance/test_question_review.py::test_five_output_types_use_actual_sources_and_keep_domain_criteria[openai-chat]",
+    "tests/acceptance/test_question_review.py::test_five_output_types_use_actual_sources_and_keep_domain_criteria[google]"
+  ],
+  "retained-ordinary-child": [
+    "tests/acceptance/test_preparation.py::test_prepared_root_is_frozen_at_its_final_location_and_reopens_in_new_process",
+    "tests/acceptance/test_integration_contract.py::test_fresh_execute_cannot_compete_with_the_existing_send_owner"
+  ],
+  "retained-ordinary-guards": [
+    "tests/acceptance/test_formal_scenarios.py::test_stable_live_entry_rejects_wrong_binding_before_profiles_processes_and_requests",
+    "tests/test_formal_qualification_cancel.py::test_public_prepare_live_rejects_the_check_runtime_directory"
   ]
 }
