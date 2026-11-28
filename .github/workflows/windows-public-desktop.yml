@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       focus:
-        description: Scope for a focused runner diagnostic
+        description: Scope for the offline desktop check
         type: choice
         options: [all, renderer-and-state, process-workflows, isolated-process-files]
         default: all
@@ -22,9 +22,9 @@ jobs:
       matrix:
         group: >-
           ${{ fromJSON(inputs.focus == 'renderer-and-state' && '["renderer-and-state"]' ||
-          inputs.focus == 'process-workflows' && '["electron-workflows","python-service"]' ||
+          inputs.focus == 'process-workflows' && '["electron-workflows","python-service","diagnose-index","diagnose-lifecycle","diagnose-exit-acceptance"]' ||
           inputs.focus == 'isolated-process-files' && '["diagnose-index","diagnose-lifecycle","diagnose-exit-acceptance"]' ||
-          '["electron-workflows","python-service","renderer-and-state","pdf-and-programming"]') }}
+          '["electron-workflows","python-service","renderer-and-state","pdf-and-programming","diagnose-index","diagnose-lifecycle","diagnose-exit-acceptance"]') }}
     env:
       MYRK_CI_DESKTOP_GROUP: ${{ matrix.group }}
     defaults:

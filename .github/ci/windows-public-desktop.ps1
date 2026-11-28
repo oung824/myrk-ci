@@ -26,16 +26,13 @@ $groups = @{
         'src/main/connection-persistence.test.ts'
         'src/main/connection-profile-context.test.ts'
         'src/main/connection-store.integration.test.ts'
-        'src/main/exit-acceptance.integration.test.ts'
         'src/main/image-preview-electron.test.ts'
-        'src/main/lifecycle.test.ts'
         'src/main/recovery.integration.test.ts'
     )
     'python-service' = @(
         'src/main/connection-handoff.test.ts'
         'src/main/connection-manager.test.ts'
         'src/main/connection-store.test.ts'
-        'src/main/index.test.ts'
         'src/main/python-service.test.ts'
         'src/renderer/App.integration.test.tsx'
         'src/renderer/Compaction.integration.test.tsx'
@@ -154,7 +151,8 @@ try {
         Where-Object Name -Match '\.test\.tsx?$' |
         ForEach-Object { [IO.Path]::GetRelativePath($desktop, $_.FullName).Replace('\', '/') } |
         Sort-Object)
-    $assigned = @($groups.Values | ForEach-Object { $_ }) + $localOfficeFile
+    $assigned = @($groups.Values | ForEach-Object { $_ }) +
+        @($diagnosticGroups.Values | ForEach-Object { $_.file }) + $localOfficeFile
     if (($inventory -join "`n") -cne (($assigned | Sort-Object) -join "`n")) {
         throw 'Desktop file assignments differ from the test inventory.'
     }

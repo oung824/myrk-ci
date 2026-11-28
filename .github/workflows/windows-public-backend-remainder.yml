@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the backend expansion
         type: choice
-        options: [all, artifact-delivery]
+        options: [all, artifact-delivery, full-public-audited]
         default: all
 
 permissions:
@@ -15,6 +15,7 @@ permissions:
 jobs:
   backend:
     name: Backend ${{ matrix.group }}
+    if: inputs.focus != 'full-public-audited'
     runs-on: ${{ contains(fromJSON('["process-and-scheduling","root-git-hooks"]'), matrix.group) && 'windows-2025' || 'windows-11-arm' }}
     timeout-minutes: 25
     strategy:
@@ -43,4 +44,78 @@ jobs:
       - name: Collect and run the selected offline tests
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_GROUP
+          exit $LASTEXITCODE
+
+  audited:
+    name: Backend ${{ matrix.group }}
+    if: inputs.focus == 'full-public-audited'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: audited-records-services, runner: windows-2025, installer: backend-public, expected_count: '97', node_digest: '1de7888a7313189c8dcf7c206ad4ae59160aa471879f73fbad9a32cd536a46c3', node: false, history: false}
+          - {group: audited-context-budget, runner: windows-11-arm, installer: backend-executor, expected_count: '119', node_digest: '23ba3980a7954f1668f0de836351060289fd99fa01a333ccd7a85cb159fce527', node: false, history: false}
+          - {group: audited-model-protocols, runner: windows-2025, installer: backend-public, expected_count: '128', node_digest: 'da662e46efd659b3a981874af12c2d086a3b909060355cec50197b95fb56daf0', node: false, history: false}
+          - {group: audited-runtime-resources, runner: windows-2025, installer: backend-public, expected_count: '138', node_digest: '62ebc7759d0c398b9e811ce840870d9c08916b7eac98679ebcae356d503b70fc', node: true, history: false}
+          - {group: audited-hooks, runner: windows-2025, installer: backend-public, expected_count: '131', node_digest: '7194627e5fc73d9d9633db606b6856ef3239db4495316308104533b031a4a844', node: true, history: false}
+          - {group: audited-scheduling, runner: windows-2025, installer: backend-public, expected_count: '47', node_digest: 'e84be37642e703556afd4d344ccf724830cbd6b3f2777ab8fdbeca0959652cbf', node: false, history: false}
+          - {group: audited-receipts, runner: windows-2025, installer: backend-public, expected_count: '86', node_digest: '303e2a0a5663108d68152469282c175d356ec8fa8a5c75df96224906d3a35dd4', node: true, history: false}
+          - {group: audited-executor, runner: windows-11-arm, installer: backend-executor, expected_count: '48', node_digest: 'ca68175b0acc4bf7d997a482f3e36ce9c22533c3533b55ee0d3cd05bf66bae72', node: false, history: false}
+          - {group: audited-desktop-conversation, runner: windows-11-arm, installer: backend-executor, expected_count: '77', node_digest: '8762d0b5b4a7e5991ef41e3707a507539e3bfe529578a074975e71aa59b692f8', node: false, history: false}
+          - {group: audited-approvals, runner: windows-11-arm, installer: backend-executor, expected_count: '92', node_digest: '7595e8a3b183faa758442d1ffbe851b343e4a1835e3d271e76e7de6f6271ad94', node: false, history: false}
+          - {group: audited-delivery-review, runner: windows-11-arm, installer: backend-executor, expected_count: '90', node_digest: 'd4312b798eb26339824cdd0cf7a85fe334143dce4569a1dbd091d4f39b60b5ee', node: false, history: false}
+          - {group: audited-delegation, runner: windows-11-arm, installer: backend-executor, expected_count: '99', node_digest: 'c5424303f5b7d23725bf5a88f50cf0c5dce965d08d1354750153426d7a8acbf3', node: false, history: false}
+          - {group: audited-recovery, runner: windows-11-arm, installer: backend-executor, expected_count: '65', node_digest: 'a646d0ff5b0d4f2e505f5928f0112f6568d96df734adae9f72f31f45e659ab42', node: false, history: false}
+          - {group: audited-serial, runner: windows-11-arm, installer: backend-executor, expected_count: '60', node_digest: '6e94626b038a24c19a1c095b5a68557c753e4e15fdf79d8f752e492ea80dad9d', node: false, history: false}
+          - {group: audited-request-protocols, runner: windows-11-arm, installer: backend-executor, expected_count: '67', node_digest: '59727250b0588152993f77464e9a2c2213e096ec5a6b5deca5f135c4b10c87b1', node: false, history: false}
+          - {group: audited-http-observation, runner: windows-11-arm, installer: backend-executor, expected_count: '123', node_digest: 'cec3df538d4753651bb04f9bd7b8543fda4574cd7e1c01dcb665bba5f1e0a109', node: false, history: false}
+          - {group: audited-synthetic-actions, runner: windows-11-arm, installer: backend-executor, expected_count: '82', node_digest: '6458c0a134a7fdd2e4de3bbe7b2c4fa7a31ce407454a2237ffe7f40d291c811a', node: false, history: true}
+          - {group: audited-synthetic-qualification, runner: windows-11-arm, installer: backend-executor, expected_count: '118', node_digest: '73a6d3223d261efaeb615dea2fb91eb6c0a0ce255114fbfa67483520ec13dbc4', node: false, history: true}
+          - {group: audited-local-scoring, runner: windows-11-arm, installer: backend-executor, expected_count: '73', node_digest: '2a2b241188564cb143363b067a60bad82a7de7a0d0104744cdf7c5dfb25632f1', node: false, history: true}
+          - {group: audited-judge, runner: windows-11-arm, installer: backend-executor, expected_count: '2', node_digest: '4e820b15844bcc28f7e2168febfa066881f015c55cffa8edec2077c94e22ab08', node: false, history: true}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up x64 Node.js for receipt and hook tests
+        if: matrix.node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.20.0'
+          architecture: x64
+          package-manager-cache: false
+      - name: Install locked Python dependencies
+        env:
+          MYRK_CI_INSTALLER: ${{ matrix.installer }}
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check $env:MYRK_CI_INSTALLER
+      - name: Install locked desktop comment parser dependencies
+        if: matrix.group == 'audited-hooks'
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check typescript-types
+      - name: Prepare the synthetic report index
+        if: matrix.history
+        run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+      - name: Verify the audited manifest and run the selected offline tests
+        env:
+          MYRK_CI_GROUP: ${{ matrix.group }}
+          MYRK_CI_COUNT: ${{ matrix.expected_count }}
+          MYRK_CI_NODE_DIGEST: ${{ matrix.node_digest }}
+        run: |
+          if ($env:MYRK_CI_GROUP -eq 'audited-hooks') {
+            $env:NODE_PATH = (Resolve-Path -LiteralPath 'desktop/node_modules').Path
+          }
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_GROUP --expected-count $env:MYRK_CI_COUNT --expected-node-digest $env:MYRK_CI_NODE_DIGEST
           exit $LASTEXITCODE

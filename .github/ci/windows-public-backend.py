@@ -3,6 +3,7 @@
 import argparse
 import ast
 from collections import Counter, defaultdict
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -129,6 +130,49 @@ DESELECT = {
     'synthetic-compaction': (
         'tests/acceptance/test_compaction.py::test_semantic_material_runs_summary_and_post_reopen_work_without_grading_leak',
     ),
+}
+AUDITED_GROUPS = {
+    'audited-records-services': GROUPS['records-and-context'] + GROUPS['desktop-service'],
+    'audited-context-budget': GROUPS['compaction-and-budget'] + GROUPS['retained-context'],
+    'audited-model-protocols': GROUPS['model-protocols'],
+    'audited-runtime-resources': GROUPS['check-resources'] + (
+        'test_check_resource_projects', 'test_check_resources',
+    ),
+    'audited-hooks': GROUPS['root-git-hooks'] + (
+        'test_pre_commit_checks', 'test_pre_commit_navigation', 'test_pre_commit_navigation_sources',
+    ),
+    'audited-scheduling': INTEGRATED_GROUPS['integrated-runner-scheduling'],
+    'audited-receipts': INTEGRATED_GROUPS['integrated-runner-receipts'] + (
+        'test_closeout_archive_bytes', 'test_closeout_archive_locations', 'test_closeout_delivery',
+        'test_closeout_hook', 'test_closeout_scope', 'test_plan_check_evidence', 'test_scoped_closeout_files',
+    ),
+    'audited-executor': GROUPS['executor-and-network'] + GROUPS['layout-context'],
+    'audited-desktop-conversation': GROUPS['desktop-conversation'],
+    'audited-approvals': GROUPS['action-approval'],
+    'audited-delivery-review': GROUPS['artifact-delivery'] + GROUPS['review-evidence'],
+    'audited-delegation': GROUPS['conversation-and-delegation'],
+    'audited-recovery': GROUPS['recovery'],
+    'audited-serial': GROUPS['serial-checks'] + ('test_check_job_cleanup_serial', 'test_check_runtime_serial'),
+    'audited-request-protocols': GROUPS['provider-transcripts'] + GROUPS['request-protocols'],
+    'audited-http-observation': (
+        'test_default_observed_http', 'test_gemini_incomplete_response', 'test_gemini_response_observation',
+        'test_http_observation_clients', 'test_request_contracts_continuation',
+        'test_request_observation_review_usage', 'test_request_observation_roles_and_layout',
+    ),
+    'audited-synthetic-actions': GROUPS['synthetic-acceptance'],
+    'audited-synthetic-qualification': (
+        GROUPS['synthetic-quality'] + GROUPS['synthetic-judge-qualification']
+        + GROUPS['synthetic-trust-and-memory'] + GROUPS['synthetic-review-and-cancellation']
+    ),
+    'audited-local-scoring': GROUPS['synthetic-local-scoring'],
+    'audited-judge': GROUPS['judge-fixtures'],
+}
+AUDITED_DESELECT = {
+    'audited-synthetic-qualification': (
+        DESELECT['synthetic-judge-qualification'] + DESELECT['synthetic-trust-and-memory']
+        + DESELECT['synthetic-review-and-cancellation']
+    ),
+    'audited-local-scoring': DESELECT['synthetic-local-scoring'],
 }
 DIAGNOSTIC_FILES = {
     'test_action_reporting_facts': 'executor-and-network',
@@ -314,11 +358,12 @@ def node_outcomes(expected, observation):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('group', choices=(*GROUPS, *INTEGRATED_GROUPS))
+    parser.add_argument('group', choices=(*GROUPS, *INTEGRATED_GROUPS, *AUDITED_GROUPS))
     parser.add_argument('--native-only', action='store_true')
     parser.add_argument('--diagnostic-file', choices=DIAGNOSTIC_FILES)
     parser.add_argument('--failed-cases-only', action='store_true')
     parser.add_argument('--expected-count', type=int)
+    parser.add_argument('--expected-node-digest')
     arguments = parser.parse_args()
     group = arguments.group
     if arguments.native_only and group != 'judge-fixtures':
@@ -329,6 +374,11 @@ def main():
         parser.error('--failed-cases-only requires --diagnostic-file')
     if arguments.expected_count is not None and arguments.expected_count < 1:
         parser.error('--expected-count must be positive')
+    if group in AUDITED_GROUPS and (
+        arguments.expected_count is None
+        or not re.fullmatch(r'[0-9a-f]{64}', arguments.expected_node_digest or '')
+    ):
+        parser.error('Audited groups require --expected-count and a SHA-256 --expected-node-digest')
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     environment = dict(os.environ, PYTHONIOENCODING='utf-8', MYRK_TASK_ID=f'github-public-backend-{group}')
     for name in ('GITHUB_STEP_SUMMARY', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE',
@@ -336,7 +386,7 @@ def main():
         environment.pop(name, None)
     publish(summary, f'### Public offline backend · {group}')
     publish(summary, 'Selected backend test files on a Windows hosted runner.')
-    groups = INTEGRATED_GROUPS if group in INTEGRATED_GROUPS else GROUPS
+    groups = AUDITED_GROUPS if group in AUDITED_GROUPS else INTEGRATED_GROUPS if group in INTEGRATED_GROUPS else GROUPS
     names = ('acceptance/test_judge_native_roundtrip',) if arguments.native_only else groups[group]
     if arguments.diagnostic_file:
         names = (arguments.diagnostic_file,)
@@ -344,7 +394,7 @@ def main():
     selection = paths
     if arguments.failed_cases_only:
         selection = tuple(f'{paths[0]}::{node}' for node in DIAGNOSTIC_CASES[arguments.diagnostic_file])
-    exclusions = DESELECT.get(group, ())
+    exclusions = AUDITED_DESELECT.get(group, DESELECT.get(group, ()))
     deselection = tuple(f'--deselect={node}' for node in exclusions)
     for path in selection:
         publish(summary, f'- `{path}`')
@@ -367,7 +417,12 @@ def main():
         if set(counts) != set(paths) or len(expected) != len(set(expected)):
             raise CheckError('The collected files or test identities differ from the selection.')
         if arguments.expected_count is not None and len(expected) != arguments.expected_count:
-            raise CheckError(f'Expected {arguments.expected_count} tests in this integrated diagnostic file.')
+            raise CheckError(f'Expected {arguments.expected_count} tests in this selected group.')
+        if arguments.expected_node_digest:
+            payload = json.dumps(sorted(expected), ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+            if sha256(payload).hexdigest() != arguments.expected_node_digest:
+                raise CheckError('The collected test identities differ from the audited manifest digest.')
+            publish(summary, f'- Audited node SHA-256: {arguments.expected_node_digest}.')
         if arguments.failed_cases_only and set(expected) != set(selection):
             raise CheckError('The collected cases differ from the reproduced failures.')
         if not arguments.diagnostic_file and group in SYNTHETIC_COUNTS and (len(expected) != SYNTHETIC_COUNTS[group]
