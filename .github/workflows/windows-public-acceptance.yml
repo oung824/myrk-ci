@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the synthetic acceptance run
         type: choice
-        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures, integrated-synthetic-controls, integrated-synthetic-materials, integrated-source-controls, integrated-runtime-controls, integrated-runtime-retry]
+        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures, integrated-synthetic-controls, integrated-synthetic-materials, integrated-source-controls, integrated-runtime-controls, integrated-runtime-retry, integrated-shutdown-behavior]
         default: all
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   acceptance:
     name: Acceptance ${{ matrix.group }}
-    if: inputs.focus != 'integrated-fixtures' && inputs.focus != 'integrated-synthetic-controls' && inputs.focus != 'integrated-synthetic-materials' && inputs.focus != 'integrated-source-controls' && inputs.focus != 'integrated-runtime-controls' && inputs.focus != 'integrated-runtime-retry'
+    if: inputs.focus != 'integrated-fixtures' && inputs.focus != 'integrated-synthetic-controls' && inputs.focus != 'integrated-synthetic-materials' && inputs.focus != 'integrated-source-controls' && inputs.focus != 'integrated-runtime-controls' && inputs.focus != 'integrated-runtime-retry' && inputs.focus != 'integrated-shutdown-behavior'
     runs-on: windows-11-arm
     timeout-minutes: 20
     strategy:
@@ -322,6 +322,50 @@ jobs:
           MYRK_CI_ACCEPTANCE_GROUP: audited-packet-stage-retry
           MYRK_CI_COUNT: '1'
           MYRK_CI_NODE_DIGEST: 6eb0346f1070e40d12bb5a2b8bd3e072a0104ac6048838b32a55484b1baff993
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_ACCEPTANCE_GROUP --expected-count $env:MYRK_CI_COUNT --expected-node-digest $env:MYRK_CI_NODE_DIGEST
+          exit $LASTEXITCODE
+
+  integrated-shutdown-behavior:
+    name: Acceptance ${{ matrix.group }}
+    if: inputs.focus == 'integrated-shutdown-behavior'
+    runs-on: windows-11-arm
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: audited-shutdown-model-combinations, expected_count: '80', node_digest: '30e3edbb3e71a891f03888a582c519df4ddade76c2bebf9ad36ade34f99ab364', synthetic: true}
+          - {group: audited-shutdown-model-rejections, expected_count: '34', node_digest: 'd9da78f322d0c079a56a5dc74fec0a9429c97358abcd2ed0ca61cb796456aed6', synthetic: true}
+          - {group: audited-review-stop-behavior, expected_count: '1', node_digest: '3866e2d1adf36b46f20f79a3e43118ba42b90051e5ddbdb2fc02af16e79b878d', synthetic: false}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Generate a neutral matcher rule table
+        if: matrix.synthetic
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-seed-shutdown-rules.py'
+          exit $LASTEXITCODE
+      - name: Prepare the synthetic report index
+        run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+      - name: Verify the audited manifest and run the selected synthetic tests
+        env:
+          MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
+          MYRK_CI_COUNT: ${{ matrix.expected_count }}
+          MYRK_CI_NODE_DIGEST: ${{ matrix.node_digest }}
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_ACCEPTANCE_GROUP --expected-count $env:MYRK_CI_COUNT --expected-node-digest $env:MYRK_CI_NODE_DIGEST
           exit $LASTEXITCODE

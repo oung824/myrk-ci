@@ -166,6 +166,9 @@ AUDITED_GROUPS = {
     ),
     'audited-local-scoring': GROUPS['synthetic-local-scoring'],
     'audited-judge': GROUPS['judge-fixtures'],
+    'audited-shutdown-model-combinations': ('acceptance/test_shutdown_family',),
+    'audited-shutdown-model-rejections': ('acceptance/test_shutdown_family',),
+    'audited-review-stop-behavior': ('acceptance/test_action_review',),
     'audited-packet-stage-retry': ('acceptance/test_quality_packet_integration',),
     'audited-queue-controls': ('acceptance/test_queue_parallel_stop',),
     'audited-request-cost-controls': ('acceptance/test_request_cost_gate',),
@@ -211,6 +214,9 @@ AUDITED_DESELECT = {
     'audited-compaction-fixtures': DESELECT['synthetic-compaction'],
 }
 AUDITED_SELECTION = {
+    'audited-shutdown-model-combinations': ('tests/acceptance/test_shutdown_family.py::test_all_twenty_complete_record_combinations_and_only_known_wrappers',),
+    'audited-shutdown-model-rejections': ('tests/acceptance/test_shutdown_family.py::test_family_rejects_incomplete_or_unknown_chains_and_unconsumed_log',),
+    'audited-review-stop-behavior': ('tests/acceptance/test_action_review.py::test_independent_review_preserves_actual_decision_and_failures[stop]',),
     'audited-packet-stage-retry': ('tests/acceptance/test_quality_packet_integration.py::test_stage_selection_keeps_original_denominator_and_does_not_run_unselected_tasks',),
     'audited-queue-controls': (
         'tests/acceptance/test_queue_parallel_stop.py::test_public_supplement_retries_and_revocation_before_a_final_reply',
