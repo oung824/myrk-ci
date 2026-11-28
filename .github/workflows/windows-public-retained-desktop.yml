@@ -1,0 +1,57 @@
+name: Windows public retained desktop processes
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Retained desktop / ${{ matrix.group }}
+    runs-on: windows-11-arm
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: retained-desktop-connection, count: '1', digest: ff4e6ce375631504589d82e4651b49ef7fdf3f6754c7aa258a20df91bc01dfbf, index_alias: false}
+          - {group: retained-formal-service-shutdown, count: '3', digest: b588ce91170d1660c78da067f88a6b7c4594937c6f545f8267a4939bc010325d, index_alias: false}
+          - {group: retained-criteria-refreeze, count: '1', digest: 3427919f9faf77d8ed181a7013bdc6ff4bc4b85bc3ee417cc72a252f08fc37f6, index_alias: true}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select the validated x64 Node release
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.20.0'
+          architecture: x64
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Install locked desktop dependencies and verify Electron
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check desktop-contracts
+      - name: Prepare the synthetic report index
+        run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index -ErrorAction Stop
+      - name: Verify exact collection, execution and recovery
+        env:
+          MYRK_CI_GROUP: ${{ matrix.group }}
+          MYRK_CI_COUNT: ${{ matrix.count }}
+          MYRK_CI_DIGEST: ${{ matrix.digest }}
+          MYRK_CI_INDEX_ALIAS: ${{ matrix.index_alias }}
+        run: >-
+          & './.github/ci/windows-public-frozen.ps1'
+          -Group $env:MYRK_CI_GROUP -NodeCount $env:MYRK_CI_COUNT -NodeDigest $env:MYRK_CI_DIGEST
+          -UseIndexAlias:($env:MYRK_CI_INDEX_ALIAS -eq 'true')

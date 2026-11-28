@@ -38,5 +38,13 @@
   "retained-ordinary-guards": [
     "tests/acceptance/test_formal_scenarios.py::test_stable_live_entry_rejects_wrong_binding_before_profiles_processes_and_requests",
     "tests/test_formal_qualification_cancel.py::test_public_prepare_live_rejects_the_check_runtime_directory"
+  ],
+  "retained-desktop-connection": [
+    "tests/acceptance/test_connection_desktop_lifecycle.py::test_public_connection_basics_keep_real_ready_errors_credentials_and_close"
+  ],
+  "retained-formal-service-shutdown": [
+    "tests/acceptance/test_formal_service_shutdown.py::test_formal_service_saves_shutdown_evidence_without_reopening_shared_stop[authorization_changed]",
+    "tests/acceptance/test_formal_service_shutdown.py::test_formal_service_saves_shutdown_evidence_without_reopening_shared_stop[running]",
+    "tests/acceptance/test_formal_service_shutdown.py::test_formal_service_saves_shutdown_evidence_without_reopening_shared_stop[stopped]"
   ]
 }

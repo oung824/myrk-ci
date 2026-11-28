@@ -6,13 +6,17 @@ on:
       focus:
         description: Scope of the public backend run
         type: choice
-        options: [standard, frozen-synthetic, frozen-history-retry, retained-synthetic, retained-materials, retained-children]
+        options: [standard, frozen-synthetic, frozen-history-retry, retained-synthetic, retained-materials, retained-children, retained-desktop-host]
         default: standard
 
 permissions:
   contents: read
 
 jobs:
+  retained-desktop-host:
+    if: inputs.focus == 'retained-desktop-host'
+    uses: ./.github/workflows/windows-public-retained-desktop.yml
+
   backend:
     name: Backend ${{ matrix.group }}
     if: inputs.focus == 'standard'

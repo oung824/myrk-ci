@@ -55,6 +55,10 @@ def retained_synthetic_registry(request, monkeypatch):
             modules = (queue_parallel_stop,)
     elif filename == "test_candidate_refreeze_compatibility.py":
         modules = ()
+    elif filename in ("test_connection_desktop_lifecycle.py", "test_formal_service_shutdown.py"):
+        from tests.support.agent_acceptance import desktop_provider
+
+        modules = (desktop_provider,)
     else:
         return
 
