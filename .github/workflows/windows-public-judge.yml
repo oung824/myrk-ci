@@ -6,7 +6,7 @@ on:
       focus:
         description: Run both synthetic checks or diagnose only the native SDK case
         type: choice
-        options: [all, native, synthetic-artifacts, quality-recovery, split-ordinary]
+        options: [all, native, synthetic-artifacts, quality-recovery, split-ordinary, split-ordinary-controls]
         default: all
 
 permissions:
@@ -136,13 +136,16 @@ jobs:
 
   split-ordinary:
     name: Behavior ${{ matrix.group }}
-    if: inputs.focus == 'split-ordinary'
+    if: inputs.focus == 'split-ordinary' || inputs.focus == 'split-ordinary-controls'
     runs-on: windows-11-arm
     timeout-minutes: 18
     strategy:
       fail-fast: false
       matrix:
-        group: [split-ordinary-1, split-ordinary-2, split-ordinary-3, split-ordinary-4]
+        group: >-
+          ${{ fromJSON(inputs.focus == 'split-ordinary-controls' &&
+          '["split-ordinary-billing-1","split-ordinary-billing-2","split-ordinary-guards-1","split-ordinary-guards-2","split-ordinary-entry-controls","split-ordinary-synthetic-forms"]' ||
+          '["split-ordinary-1","split-ordinary-2","split-ordinary-3","split-ordinary-4"]') }}
     defaults:
       run:
         shell: pwsh

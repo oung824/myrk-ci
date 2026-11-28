@@ -12,7 +12,7 @@ rows = json.loads((ci / "windows-public-split-selection.json").read_text(encodin
 selected = rows[group]
 nodes = selected["node_ids"]
 files = sorted({node.partition("::")[0] for node in nodes})
-selectors = tuple(sorted({node.partition("[")[0] for node in nodes}))
+selectors = tuple(nodes) if selected.get("exact_arguments") else tuple(sorted({node.partition("[")[0] for node in nodes}))
 plugin = root / "tests/support/github_split_behavior.py"
 assert not plugin.exists()
 shutil.copyfile(ci / "windows-public-split-plugin.py", plugin)
@@ -25,7 +25,8 @@ try:
     managed = backend["run_pytest"]
 
     def run(summary, environment, phase, paths, *options):
-        return managed(summary, environment, phase, paths, *options, "-p", "tests.support.github_split_behavior")
+        return managed(summary, environment, phase, paths, *options, "-p", "tests.support.github_split_behavior",
+                       f"--myrk-split-group={group}")
 
     backend["main"].__globals__["run_pytest"] = run
     sys.argv = [str(entry), group, "--expected-count", str(selected["count"]),
