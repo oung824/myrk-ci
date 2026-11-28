@@ -6,7 +6,7 @@ on:
       focus:
         description: Run the four reproduced cases, full files, or integrated runner checks
         type: choice
-        options: [cases, files, integrated, artifact, auxiliary, file-behavior, isolated-formal]
+        options: [cases, files, integrated, artifact, auxiliary, file-behavior, isolated-formal, source-only-controls]
         default: cases
 
 permissions:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   diagnosis:
-    if: inputs.focus != 'artifact' && inputs.focus != 'auxiliary' && inputs.focus != 'file-behavior' && inputs.focus != 'isolated-formal'
+    if: contains(fromJSON('["cases","files","integrated"]'), inputs.focus)
     name: Diagnose ${{ matrix.name }}
     runs-on: windows-11-arm
     timeout-minutes: 12
@@ -258,4 +258,36 @@ jobs:
           MYRK_FORMAL_SCOPE: ${{ matrix.scope }}
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-isolated-formal.py' $env:MYRK_FORMAL_SCOPE
+          exit $LASTEXITCODE
+
+  source-only-controls:
+    name: Source-only control ${{ matrix.group }}
+    if: inputs.focus == 'source-only-controls'
+    runs-on: windows-11-arm
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: ordinary-protocols, count: '1', digest: 'f1f8e8f5679c7b5ccb2ffe781252d831d1dd22c36f22a9c1a220e8a4d172ffc6'}
+          - {group: delegated-recovery-shape, count: '2', digest: '57635c61a1bf5a8f4f6dc3ca09ed2bcf8b473672c6c45e5fadccc136e7c774e1'}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python and the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Verify exact source-only controls
+        env:
+          MYRK_CI_SOURCE_GROUP: ${{ matrix.group }}
+          MYRK_CI_SOURCE_COUNT: ${{ matrix.count }}
+          MYRK_CI_SOURCE_DIGEST: ${{ matrix.digest }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-source-only-controls.py' $env:MYRK_CI_SOURCE_GROUP $env:MYRK_CI_SOURCE_COUNT $env:MYRK_CI_SOURCE_DIGEST
           exit $LASTEXITCODE
