@@ -93,9 +93,9 @@ jobs:
           exit $LASTEXITCODE
 
   artifact:
-    name: Verify artifact delivery on native Windows
+    name: Verify artifact delivery on Windows ARM
     if: inputs.focus == 'artifact'
-    runs-on: windows-2025
+    runs-on: windows-11-arm
     timeout-minutes: 12
     defaults:
       run:
