@@ -45,9 +45,10 @@ async function run() {
       await command({ action: 'configure', key: 'exit-acceptance-controlled' })
       await waitFor(async () => (await events()).some(event => event.event === 'configured'), 'controlled connection')
       await execute('window.myrk.selectWorkspace()')
+      const checkArgv = [process.env.MYRK_PYTHON, '-u', '-m', 'tests.exit_acceptance_fixture', 'check', join(directory, 'check-config.json')]
       await command({ action: 'send', prompt: mode === 'approval' ? '先改notes.txt，再申请删除keep.txt，等待我决定。' : '先把notes.txt中的苹果3改为苹果5，然后运行指定检查。', scope: {
         root: directory, allowed_actions: ['read', 'edit', 'check'], provider: 'deepseek', recipients: ['deepseek'],
-        checks: [{ name: '指定检查', argv: [process.env.MYRK_PYTHON, '-u', '-m', 'tests.exit_acceptance_fixture', 'check'] }],
+        checks: [{ name: '指定检查', argv: checkArgv }],
       } })
       await waitFor(() => execute(`document.querySelector('[role="status"]').getClientRects().length > 0 && document.querySelector('[role="status"]').textContent.includes('正在等待回答服务')`), 'actual waiting-for-service display')
       await log('waiting-service-observed', { text: await execute(`document.querySelector('[role="status"]').textContent`) })
@@ -61,6 +62,8 @@ async function run() {
         })`), 'actual specified check in progress')
         await log('executing-observed', { text: await execute('document.body.textContent') })
         await waitFor(() => existsSync(join(directory, 'heartbeat.txt')), 'real child heartbeat')
+        const roles = (await readFile(join(directory, 'roles.jsonl'), 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+        assert.deepEqual(roles.find(item => item.role === 'check')?.argv, checkArgv, 'The check must receive the registered argv')
         if (mode === 'timeout') {
           await waitFor(async () => (await events()).some(event => event.event === 'finished'), 'real default 60-second completion', 75000)
           const finished = (await events()).find(event => event.event === 'finished')

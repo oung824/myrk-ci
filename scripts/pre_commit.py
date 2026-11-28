@@ -11,7 +11,7 @@ from typing import TypedDict, cast
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from scripts.check_navigation import EVIDENCE_INDEXES, check_navigation
+from scripts.check_navigation import EXPLICIT_DOCUMENTS, check_navigation
 from scripts.check_comments import BASELINE, WEB_SCANNER
 
 HOOK_INPUTS = [
@@ -20,6 +20,9 @@ HOOK_INPUTS = [
 ]
 TOKEN_LIMIT_EXEMPTIONS = ".githooks/token-limit-exemptions.txt"
 CLOSEOUT_SCRIPT = "scripts/check_closeout.py"
+CLOSEOUT_INVENTORY = "scripts/closeout_inventory.py"
+CLOSEOUT_RUNS = "scripts/closeout_runs.py"
+CLOSEOUT_BORROWED = "scripts/closeout_borrowed.py"
 CLOSEOUT_FILE_LISTS = "scripts/closeout_file_lists.py"
 BYTES_PER_TOKEN = 4
 MAX_FILE_TOKENS = 5_000
@@ -31,23 +34,29 @@ class CheckCommand(TypedDict):
     cwd: str
 
 
-def git_output(root: Path, *arguments: str, input_data: bytes | None = None) -> bytes:
+def git_output(root: Path, *arguments: str, input_data: bytes | None = None,
+               env: dict[str, str] | None = None) -> bytes:
     return subprocess.run(["git", "-C", str(root), *arguments], check=True, capture_output=True,
-                          input=input_data).stdout
+                          input=input_data, env=env).stdout
 
 
-def git_paths(root: Path, command: str, *arguments: str) -> list[str]:
-    return [value.decode("utf-8") for value in git_output(root, command, "-z", *arguments).split(b"\0") if value]
+def git_paths(root: Path, command: str, *arguments: str, env: dict[str, str] | None = None) -> list[str]:
+    output = git_output(root, command, "-z", *arguments, env=env)
+    return [value.decode("utf-8") for value in output.split(b"\0") if value]
+
+
+def staged_size_exemptions(root: Path, *, env: dict[str, str] | None = None) -> list[str]:
+    exemption_index_spec = f":{TOKEN_LIMIT_EXEMPTIONS}".encode("ascii")
+    header, _, content = git_output(root, "cat-file", "--batch=%(objecttype)",
+                                    input_data=exemption_index_spec + b"\n", env=env).partition(b"\n")
+    if header not in {b"blob", exemption_index_spec + b" missing"}:
+        raise ValueError(f"Cannot read {TOKEN_LIMIT_EXEMPTIONS} from the proposed Git index")
+    return [pattern for line in content.decode("utf-8-sig").splitlines()
+            if (pattern := line.strip()) and not pattern.startswith("#")]
 
 
 def check_staged_file_sizes(root: Path) -> bool:
-    exemption_index_spec = f":{TOKEN_LIMIT_EXEMPTIONS}".encode("ascii")
-    header, _, content = git_output(root, "cat-file", "--batch=%(objecttype)",
-                                    input_data=exemption_index_spec + b"\n").partition(b"\n")
-    if header not in {b"blob", exemption_index_spec + b" missing"}:
-        raise ValueError(f"Cannot read {TOKEN_LIMIT_EXEMPTIONS} from the proposed Git index")
-    exclusions = [f":(top,exclude,glob){pattern}" for line in content.decode("utf-8-sig").splitlines()
-                  if (pattern := line.strip()) and not pattern.startswith("#")]
+    exclusions = [f":(top,exclude,glob){pattern}" for pattern in staged_size_exemptions(root)]
     diff = git_output(root, "diff", "--cached", "--raw", "-z", "--no-abbrev", "--no-renames",
                       "--diff-filter=AMT", "--ita-invisible-in-index", "--", *exclusions)
     entries = diff.split(b"\0")[:-1]
@@ -124,7 +133,7 @@ def main() -> int:
         comment_check,
     ]
     inputs = HOOK_INPUTS + git_paths(ROOT, "ls-files", "--cached", "--",
-                                   ":(top,glob)*.md", ":(top,glob)docs/**/*.md", *EVIDENCE_INDEXES)
+                                   ":(top,glob)*.md", ":(top,glob)docs/**/*.md", *EXPLICIT_DOCUMENTS)
     manifest = os.environ.get("MYRK_CLOSEOUT_MANIFEST")
     preflight: CheckCommand | None = None
     if manifest:
@@ -145,7 +154,7 @@ def main() -> int:
         check=True, capture_output=True, text=True, encoding="utf-8").stdout.splitlines()
     worker_environment = {key: value for key, value in environment.items() if key not in local_variables}
     if preflight:
-        closeout_inputs = [CLOSEOUT_SCRIPT]
+        closeout_inputs = [CLOSEOUT_SCRIPT, CLOSEOUT_INVENTORY, CLOSEOUT_RUNS, CLOSEOUT_BORROWED]
         if CLOSEOUT_FILE_LISTS in staged or (ROOT / CLOSEOUT_FILE_LISTS).exists():
             closeout_inputs.append(CLOSEOUT_FILE_LISTS)
         if not require_staged_inputs([], closeout_inputs):

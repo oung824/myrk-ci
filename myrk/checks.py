@@ -14,6 +14,7 @@ from time import monotonic
 from myrk.actions import Action
 from myrk.permissions import AccessSettings
 from myrk.supervisor_runtime import SUPERVISOR_RUNTIME
+from myrk.windows_jobs import active_job_processes, job_exit_poll_delays, terminate_job
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -42,24 +43,16 @@ def job_active(name: str) -> int:
     """Query only this action's uniquely named owned Windows process group."""
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.OpenJobObjectW.argtypes, kernel.OpenJobObjectW.restype = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR], wintypes.HANDLE
-    kernel.QueryInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p]
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
     handle = kernel.OpenJobObjectW(4, False, name)
     if not handle:
         if ctypes.get_last_error() == 2:
             return 0
         raise ctypes.WinError(ctypes.get_last_error())
-    accounting = _Accounting()
     try:
-        if not kernel.QueryInformationJobObject(handle, 1, ctypes.byref(accounting), ctypes.sizeof(accounting), None):
-            raise ctypes.WinError(ctypes.get_last_error())
-        return int(accounting.active)
+        return active_job_processes(kernel, handle)
     finally:
         kernel.CloseHandle(handle)
-
-
-class _Accounting(ctypes.Structure):
-    _fields_ = [(name, ctypes.c_longlong) for name in ("user", "kernel", "period_user", "period_kernel")] + [(name, wintypes.DWORD) for name in ("faults", "total", "active", "terminated")]
 
 
 async def execute_check(argv: list[str], cwd: Path, timeout: float, action: Action, *, access: AccessSettings, save: Callable[[], None], evidence_directory: Path, protected_paths: list[Path], extra_write_paths: list[str] | None = None,
@@ -68,8 +61,6 @@ async def execute_check(argv: list[str], cwd: Path, timeout: float, action: Acti
     kernel.CreateJobObjectW.argtypes, kernel.CreateJobObjectW.restype = [ctypes.c_void_p, wintypes.LPCWSTR], wintypes.HANDLE
     kernel.OpenProcess.argtypes, kernel.OpenProcess.restype = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD], wintypes.HANDLE
     kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
-    kernel.TerminateJobObject.argtypes = [wintypes.HANDLE, wintypes.UINT]
-    kernel.QueryInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p]
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
     action.job_name = f"Local\\Myrk-{action.id}"
     evidence_directory.mkdir(parents=True, exist_ok=True)
@@ -149,20 +140,17 @@ async def execute_check(argv: list[str], cwd: Path, timeout: float, action: Acti
                 await asyncio.sleep(.01)
         if process is not None and not assigned and process.poll() is None:
             process.kill()
-        if not kernel.TerminateJobObject(job, 1):
-            if process is not None and process.poll() is None:
-                process.kill()
+        try:
+            try:
+                terminate_job(kernel, job)
+            except OSError:
+                if process is not None and process.poll() is None:
+                    process.kill()
+                raise
+            for delay in job_exit_poll_delays(kernel, job):
+                await asyncio.sleep(delay)
+        finally:
             kernel.CloseHandle(job)
-            raise ctypes.WinError(ctypes.get_last_error())
-        accounting = _Accounting()
-        while True:
-            if not kernel.QueryInformationJobObject(job, 1, ctypes.byref(accounting), ctypes.sizeof(accounting), None):
-                kernel.CloseHandle(job)
-                raise ctypes.WinError(ctypes.get_last_error())
-            if accounting.active == 0:
-                break
-            await asyncio.sleep(0.01)
-        kernel.CloseHandle(job)
         if process is not None:
             if process.poll() is None:
                 await asyncio.to_thread(process.wait)

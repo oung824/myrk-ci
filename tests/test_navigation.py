@@ -62,6 +62,26 @@ def test_deleted_guidance_entry_is_rejected(guidance: Path) -> None:
     assert "Missing guidance entry: CODING_STANDARDS.md" in result["errors"]
 
 
+@pytest.mark.parametrize("path", [
+    ".agents/skills/delete-comment/SKILL.md",
+    "tests/support/agent_acceptance/README.md",
+    "tests/acceptance/plans/README.md",
+])
+def test_maintained_guidance_checks_local_links_and_headings(guidance: Path, path: str) -> None:
+    source = guidance / path
+    source.parent.mkdir(parents=True)
+    source.write_text("[Reference](target.md#intro)\n", encoding="utf-8")
+
+    assert check_navigation(guidance)["errors"] == [f"{path}:1: missing local target target.md#intro"]
+
+    target = source.with_name("target.md")
+    target.write_text("# Other\n", encoding="utf-8")
+    assert check_navigation(guidance)["errors"] == [f"{path}:1: missing heading #intro in target.md"]
+
+    target.write_text("# Intro\n", encoding="utf-8")
+    assert check_navigation(guidance)["ok"] is True
+
+
 def test_historical_evidence_is_a_link_target_not_a_second_current_guidance_source(guidance: Path) -> None:
     evidence = guidance / ".scratch/old-result"
     evidence.mkdir(parents=True)

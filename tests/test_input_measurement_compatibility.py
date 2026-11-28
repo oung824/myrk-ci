@@ -14,6 +14,7 @@ from myrk.compaction import ContextLimitExceeded, WindowUsage, part_hash
 from myrk.context import CurrentContext, RequestLayout
 from myrk.conversation import Conversation, ConversationRecord, Task
 from myrk.provider import ProviderConfig, configured_model
+from tests.support.observed_http import observed_mock_transport
 
 
 def test_reopened_low_usage_anchor_cannot_bypass_the_full_input_budget(tmp_path: Path) -> None:
@@ -86,7 +87,7 @@ def test_reported_usage_stays_recorded_without_a_new_capacity_anchor(tmp_path: P
         config = ProviderConfig(context_window_override=128000, output_token_reserve=1024, context_safety_margin=512)
         task = Task(goal="Report local material only.", scope=None, provider_config=config)
         path = tmp_path / "conversation.json"
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with configured_model("synthetic-only", config, http_client=http) as model:
                 first = await Conversation(path).ask(task.goal, document=None, task=task, model=model)
                 assert first.status == "completed", first.error

@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from tests.acceptance.judge_test_material import judge_test_material
+from tests.acceptance.judge_test_material import judge_test_material, register_judge_parent_cleanup
 from tests.acceptance.test_judge_qualification import candidate, samples
 from tests.support.agent_acceptance import (
     AcceptancePlan,
@@ -126,8 +126,7 @@ def test_full_synthetic_judge_ledger_preserves_frozen_scores_and_reopen(prepared
         )
         gate = LiveGate(prepared_root, registry, grant)
         parent_index = gate.parent_binding_path(parent.parent_id)
-        assert not parent_index.exists()
-        request.addfinalizer(lambda: parent_index.unlink(missing_ok=True))
+        register_judge_parent_cleanup(request, parent_index, parent_id=parent.parent_id, accounting_root=prepared_root)
 
         result = RunResult(uuid4().hex, [], acceptance_public_root / "result.json", version_facts(plan, registry),
                            registry.catalogue(), rows)

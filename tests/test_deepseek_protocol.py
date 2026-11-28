@@ -11,6 +11,7 @@ from pydantic_ai.providers.deepseek import DeepSeekProvider
 
 from myrk.conversation import Conversation, TaskScope
 from myrk.conversation import Task
+from tests.support.observed_http import observed_mock_transport
 
 
 @pytest.mark.parametrize("status,used,expected", [(503, 0, 3), (503, 9, 1), (400, 0, 1), (401, 0, 1), (403, 0, 1), (429, 0, 1)])
@@ -51,7 +52,7 @@ def test_temporary_service_failure_retries_inside_the_original_task_budget(tmp_p
         chunk = {"id": "recovered", "object": "chat.completion.chunk", "created": 1, "model": "deepseek-flash", "choices": [{"index": 0, "delta": {"role": "assistant", "content": "服务恢复后回答"}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 4, "completion_tokens": 2, "total_tokens": 6}}
         return httpx2.Response(200, text=f"data: {json.dumps(chunk)}\n\ndata: [DONE]\n\n", headers={"content-type": "text/event-stream"})
     async def run():
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with AsyncOpenAI(api_key="synthetic-only", base_url="https://api.deepseek.com", http_client=http, max_retries=0) as client:
                 path = tmp_path / "retry.json"
                 turn = await Conversation(path).ask("回答", document=None, model=OpenAIChatModel("deepseek-flash", provider=DeepSeekProvider(openai_client=client)))
@@ -137,7 +138,7 @@ def test_delegation_native_messages_and_complete_or_unknown_total_usage(tmp_path
             chunks[-1]["usage"] = {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18}
         return httpx2.Response(200, text="".join(f"data: {json.dumps(chunk)}\n\n" for chunk in chunks) + "data: [DONE]\n\n", headers={"content-type": "text/event-stream"})
     async def run():
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with AsyncOpenAI(api_key="synthetic-key-not-a-real-account", base_url="https://api.deepseek.com", http_client=http, max_retries=0) as client:
                 conversation = Conversation(tmp_path / "record.json")
                 turn = await conversation.ask("读取后核验", document=None, model=OpenAIChatModel("deepseek-flash", provider=DeepSeekProvider(openai_client=client)), thinking=True, scope=TaskScope(root=str(tmp_path), allowed_actions=["read"], provider="deepseek", recipients=["deepseek"]))

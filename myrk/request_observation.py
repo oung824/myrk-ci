@@ -1,6 +1,6 @@
 """Request-scoped observations of the final model HTTP exchange, without body storage."""
 
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from hashlib import sha256
@@ -9,7 +9,6 @@ from time import monotonic
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import urlsplit, urlunsplit
 
-import httpx2
 from pydantic import BaseModel, Field
 from pydantic_ai import RunContext
 from pydantic_ai.messages import ModelMessage, ModelResponse
@@ -45,6 +44,7 @@ class RequestObservation(BaseModel):
     protocol: Literal["deepseek", "openai-chat", "google", "unknown"]
     model: str
     layout_version: int | None = None
+    native_http: bool | None = Field(default=None, exclude_if=lambda value: value is None)
     input_tokens: int | None = None
     output_tokens: int | None = None
     thinking_tokens: int | None = None
@@ -70,6 +70,13 @@ class RequestObservation(BaseModel):
     finish_reason: str | None = None
     wire: WireRequestSummary | None = None
 
+    @property
+    def uses_native_usage(self) -> bool:
+        """Use the saved source when present, including for clients of a known protocol."""
+        if self.native_http is None:
+            return self.protocol != "unknown"
+        return self.native_http
+
 
 def _digest(value: Any) -> str:
     return sha256(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
@@ -82,6 +89,33 @@ class _Capture:
         self.observation = attempt.observation
         self.change_reasons = change_reasons
         self.started = monotonic()
+
+    def record_http_request(self, body: bytes) -> None:
+        try:
+            payload = json.loads(body)
+        except ValueError:
+            return
+        if not isinstance(payload, dict):
+            return
+        google = self.observation.protocol == "google"
+        messages = payload.get("contents" if google else "messages", [])
+        tools = payload.get("tools", [])
+        if not isinstance(messages, list) or not isinstance(tools, list):
+            return
+        system = payload.get("systemInstruction", []) if google else [
+            message for message in messages
+            if isinstance(message, dict) and message.get("role") in ("system", "developer")
+        ]
+        tool_count = len(tools)
+        if google:
+            tool_count = sum(len(declarations) for tool in tools if isinstance(tool, dict)
+                             and isinstance(declarations := tool.get("functionDeclarations"), list))
+        self.observation.wire = WireRequestSummary(
+            body_sha256=sha256(body).hexdigest(), body_bytes=len(body),
+            system_sha256=_digest(system), tools_sha256=_digest(tools), messages_sha256=_digest(messages),
+            message_count=len(messages), tool_count=tool_count, message_hashes=[_digest(message) for message in messages],
+            change_reasons=self.change_reasons,
+        )
 
     def receive(self, value: Any) -> None:
         if not isinstance(value, dict):
@@ -203,82 +237,16 @@ def current_request_attempt() -> "RequestAttempt | None":
 
 def record_response_usage(attempt: "RequestAttempt", usage: RequestUsage) -> None:
     """Use original wire counters; unobserved models retain SDK usage semantics."""
-    if attempt.observation is not None and attempt.observation.protocol != "unknown":
-        attempt.input_tokens = attempt.observation.input_tokens
-        attempt.output_tokens = attempt.observation.output_tokens
+    observation = attempt.observation
+    if observation is not None and observation.uses_native_usage:
+        attempt.input_tokens = observation.input_tokens
+        attempt.output_tokens = observation.output_tokens
+    elif observation is not None and observation.protocol != "unknown":
+        attempt.input_tokens = (usage.input_tokens or None) if usage.unmeasured_requests else usage.input_tokens
+        attempt.output_tokens = (usage.output_tokens or None) if usage.unmeasured_requests else usage.output_tokens
     elif usage.has_values():
         attempt.input_tokens = usage.input_tokens
         attempt.output_tokens = usage.output_tokens
-
-
-async def _observe_http_request(request: httpx2.Request) -> None:
-    capture = _active_capture.get()
-    if capture is None:
-        return
-    body = request.content
-    payload = json.loads(body)
-    google = capture.observation.protocol == "google"
-    messages = payload.get("contents" if google else "messages", [])
-    tools = payload.get("tools", [])
-    system = payload.get("systemInstruction", []) if google else [message for message in messages if message.get("role") in {"system", "developer"}]
-    capture.observation.wire = WireRequestSummary(
-        body_sha256=sha256(body).hexdigest(), body_bytes=len(body),
-        system_sha256=_digest(system),
-        tools_sha256=_digest(tools), messages_sha256=_digest(messages),
-        message_count=len(messages), tool_count=sum(len(tool.get("functionDeclarations", [])) for tool in tools) if google else len(tools), message_hashes=[_digest(message) for message in messages],
-        change_reasons=capture.change_reasons,
-    )
-
-
-class _ResponseBody:
-    def __init__(self, capture: _Capture, *, sse: bool) -> None:
-        self.capture, self.sse = capture, sse
-        self.buffer = b""
-
-    def receive_json(self, data: bytes) -> None:
-        try:
-            value = json.loads(data)
-        except (ValueError, UnicodeDecodeError):
-            return
-        self.capture.receive(value)
-
-    def feed(self, chunk: bytes) -> None:
-        self.buffer += chunk
-        if self.sse:
-            while b"\n" in self.buffer:
-                line, self.buffer = self.buffer.split(b"\n", 1)
-                if line.startswith(b"data:") and line[5:].strip() != b"[DONE]":
-                    self.receive_json(line[5:])
-
-    def finish(self) -> None:
-        if self.sse and self.buffer.startswith(b"data:"):
-            self.receive_json(self.buffer[5:])
-        elif not self.sse:
-            self.receive_json(self.buffer)
-        self.buffer = b""
-
-
-async def _observe_http_response(response: httpx2.Response) -> None:
-    capture = _active_capture.get()
-    if capture is None:
-        return
-    body = _ResponseBody(capture, sse="text/event-stream" in response.headers.get("content-type", ""))
-    if response.is_stream_consumed:
-        body.feed(response.content)
-        body.finish()
-        return
-    decoded_bytes = response.aiter_bytes
-
-    async def observed_bytes(chunk_size: int | None = None) -> AsyncGenerator[bytes, None]:
-        try:
-            async for chunk in decoded_bytes(chunk_size):
-                body.feed(chunk)
-                yield chunk
-            body.finish()
-        finally:
-            body.buffer = b""
-
-    response.aiter_bytes = observed_bytes  # type: ignore[method-assign]
 
 
 class _ObservedModel(WrapperModel):
@@ -323,19 +291,14 @@ def observe_request(model: Model, attempt: "RequestAttempt", *, layout_version: 
     endpoint = urlsplit(model.base_url or "")
     safe_endpoint = urlunsplit((endpoint.scheme, endpoint.netloc.rsplit("@", 1)[-1], endpoint.path, "", ""))
     protocol: Literal["deepseek", "openai-chat", "google", "unknown"] = "unknown"
-    http = None
     if isinstance(actual, OpenAIChatModel):
         protocol = "deepseek" if actual.system == "deepseek" else "openai-chat"
-        http = actual.client._client
     elif isinstance(actual, GoogleModel):
         protocol = "google"
-        google_http = actual.client._api_client._async_httpx_client
-        assert isinstance(google_http, httpx2.AsyncClient)
-        http = google_http
-    if http is not None and _observe_http_request not in http.event_hooks["request"]:
-        http.event_hooks["request"].append(_observe_http_request)
-        http.event_hooks["response"].append(_observe_http_response)
-    attempt.observation = RequestObservation(provider=model.system, endpoint=safe_endpoint, protocol=protocol, model=model.model_name, layout_version=layout_version)
+    attempt.observation = RequestObservation(
+        provider=model.system, endpoint=safe_endpoint, protocol=protocol, model=model.model_name,
+        layout_version=layout_version, native_http=False,
+    )
     if protocol == "google":
         attempt.observation.field_presence = dict.fromkeys(_GOOGLE_USAGE_FIELDS, False)
     return _ObservedModel(model, attempt, list(change_reasons or []))

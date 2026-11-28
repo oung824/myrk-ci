@@ -8,51 +8,17 @@ from datetime import datetime, timezone
 import hashlib
 from importlib.metadata import version
 import json
-import math
 from pathlib import Path
 import os
-import stat
 import subprocess
 import sys
 from threading import Event
 from time import monotonic
-from typing import Any, Callable, cast
+from typing import Any, Callable
 from uuid import uuid4
 
-from scripts.pytest_shards import FORMAL_PARAMETER_FUNCTIONS, get_source_inputs
-
-
-TIMING_LIMIT = 2 * 1024 ** 2
-
-
-def read_timings(path: Path, project: Path) -> dict[str, Any]:
-    """Read optional timing hints at the project-owned filesystem boundary."""
-    if (".." in path.parts or any(part.is_symlink() or part.is_junction() for part in (path, *path.parents))
-            or not path.resolve().is_relative_to(project) or not stat.S_ISREG(path.stat().st_mode)
-            or path.stat().st_size > TIMING_LIMIT):
-        raise ValueError("Timings must be an ordinary project-local file of at most 2 MiB.")
-    value = json.loads(path.read_text(encoding="utf-8"))
-    entries = value.get("node_seconds") if isinstance(value, dict) else None
-    if (not isinstance(entries, dict) or any(not isinstance(node, str) or not node or "\\" in node.partition("::")[0]
-            or Path(node.partition("::")[0]).is_absolute() or ".." in Path(node.partition("::")[0]).parts
-            or type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0
-            for node, seconds in entries.items())):
-        raise ValueError("Timing node_seconds must map relative test identities to finite nonnegative durations.")
-    return cast(dict[str, Any], value)
-
-
-def read_observation(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if (not isinstance(value, dict) or not isinstance(value.get("selected_nodeids"), list)
-            or not all(isinstance(node, str) for node in value["selected_nodeids"])
-            or not isinstance(value.get("reports"), list)
-            or any(not isinstance(item, dict) or any(not isinstance(item.get(key), str)
-                for key in ("nodeid", "when", "outcome"))
-                or item["outcome"] not in {"passed", "failed", "skipped"}
-                or type(item.get("duration")) not in (int, float) or not math.isfinite(item["duration"])
-                or item["duration"] < 0 for item in value["reports"])):
-        raise ValueError("Invalid shard observation schema.")
-    return value
+from myrk.check_outputs import CheckLaunch, configuration_path
+from scripts.pytest_shards import FORMAL_PARAMETER_FUNCTIONS, get_source_inputs, read_observation, read_timings, update_timing_index
 
 
 def run_parallel(
@@ -63,7 +29,12 @@ def run_parallel(
     if any(path.is_symlink() or path.is_junction() for path in (results, *results.parents)):
         raise ValueError("Parallel check results must not use links.")
     results.mkdir(parents=True, exist_ok=True)
-    result_path = results / ("parallel-" + uuid4().hex + ".json")
+    invocation_id = uuid4().hex
+    result_path = results / f"parallel-{invocation_id}.json"
+    launch = CheckLaunch(project, source, result_path, invocation_id, "pytest-parallel", arguments)
+    groups = {"collection": uuid4().hex}
+    launch.set_groups(groups)
+    dispatched: set[str] = set()
     started = monotonic()
     stop = Event()
     result: dict[str, Any] = {
@@ -83,9 +54,15 @@ def run_parallel(
     observed_seconds: dict[str, float] = {}
     timing_path = project / ".scratch/check-runs/timings/backend.json"
     environment: dict[str, Any] = {}
+
+    def run_group(name: str, arguments: list[str]) -> dict[str, Any]:
+        return run_check("pytest", arguments, stop=stop, below_normal=True, invocation_id=groups[name],
+                         parent_invocation_id=invocation_id, group=name, version=launch.record["source_version"])
+
     try:
         if result["scheduling_mode"] not in {"legacy", "duration"}:
             raise ValueError("MYRK_TEST_SCHEDULING must be legacy or duration.")
+        launch.bind_pytest_config(configuration_path(arguments, source))
         dependency_inputs = {name: hashlib.sha256((source / name).read_bytes()).hexdigest()
             for name in ("requirements.txt", "requirements-dev.txt", "requirements.lock", "desktop/package-lock.json")
             if (source / name).is_file()}
@@ -99,8 +76,9 @@ def run_parallel(
         if not kernel.SetPriorityClass(kernel.GetCurrentProcess(), 0x4000):
             raise ctypes.WinError(ctypes.get_last_error())
         result["coordinator_priority_class"] = int(kernel.GetPriorityClass(kernel.GetCurrentProcess()))
-        collected = run_check("pytest", [*arguments, "--collect-only", "-p", "scripts.pytest_shards",
-            "--myrk-shard=collect"], stop=stop, below_normal=True)
+        dispatched.add("collection")
+        collected = run_group("collection", [*arguments, "--collect-only", "-p", "scripts.pytest_shards",
+                                              "--myrk-shard=collect"])
         result["collection_receipt"] = collected
         if collected["exit_code"]:
             result["exit_code"] = collected["exit_code"]
@@ -110,8 +88,7 @@ def run_parallel(
         paths = [path for path in paths if path.is_file()]
         if len(paths) != 1:
             raise ValueError("The collection did not produce exactly one complete shard manifest.")
-        manifest = paths[0]
-        plan = json.loads(manifest.read_text(encoding="utf-8"))
+        plan = json.loads(paths[0].read_text(encoding="utf-8"))
         serial_nodes = [node for node in plan["nodeids"]
             if Path(node.partition("::")[0]).match("test_*_serial.py")]
         serial_set = set(serial_nodes)
@@ -165,6 +142,7 @@ def run_parallel(
             plan["lanes"] = {name: [node for node in nodes if node not in serial_set]
                 for name, nodes in plan["lanes"].items()}
         plan["lanes"]["serial"] = serial_nodes
+        manifest = results / f"pytest-plan-{invocation_id}.json"
         manifest.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
         result["manifest_path"] = str(manifest)
         result["completeness"]["expected_count"] = len(plan["nodeids"])
@@ -172,6 +150,12 @@ def run_parallel(
             name: {"expected_nodeids": nodes, "receipt": None}
             for name, nodes in plan["lanes"].items()
         }
+        groups.update({name: uuid4().hex for name, nodes in plan["lanes"].items() if nodes})
+        launch.coverage.update(node_count=len(plan["nodeids"]),
+                               selection_sha256=hashlib.sha256(json.dumps(plan["nodeids"]).encode()).hexdigest())
+        launch.record["source_version"]["inputs_sha256"] = hashlib.sha256(
+            json.dumps(plan["source_inputs"], sort_keys=True).encode()).hexdigest()
+        launch.set_groups(groups)
         active = [name for name, nodes in plan["lanes"].items() if nodes and name != "serial"]
         result["execution_mode"] = "parallel" if len(active) > 1 else "serial"
         result["dependency_preparation"] = {"status": "not_required"}
@@ -195,8 +179,9 @@ def run_parallel(
             result["dependency_preparation"] = {"status": prepared, "path": str(link), "target": str(modules)}
         executor = ThreadPoolExecutor(max_workers=2)
         for name in active:
-            future = executor.submit(run_check, "pytest", [*arguments, "-p", "scripts.pytest_shards",
-                "--myrk-shard=" + name, "--myrk-shard-manifest=" + str(manifest)], stop=stop, below_normal=True)
+            future = executor.submit(run_group, name, [*arguments, "-p", "scripts.pytest_shards",
+                "--myrk-shard=" + name, "--myrk-shard-manifest=" + str(manifest)])
+            dispatched.add(name)
             futures[future] = name
         for future in as_completed(futures):
             receipt = future.result()
@@ -206,8 +191,9 @@ def run_parallel(
         executor.shutdown(wait=True)
         executor = None
         if serial_nodes and not stop.is_set():
-            result["lanes"]["serial"]["receipt"] = run_check("pytest", [*arguments, "-p", "scripts.pytest_shards",
-                "--myrk-shard=serial", "--myrk-shard-manifest=" + str(manifest)], stop=stop, below_normal=True)
+            dispatched.add("serial")
+            result["lanes"]["serial"]["receipt"] = run_group("serial", [*arguments, "-p", "scripts.pytest_shards",
+                "--myrk-shard=serial", "--myrk-shard-manifest=" + str(manifest)])
     except BaseException as error:
         stop.set()
         result["exit_code"] = 130 if isinstance(error, KeyboardInterrupt) else 1
@@ -291,52 +277,24 @@ def run_parallel(
         result["runtime_removed"] = all(receipt["runtime_removed"] for receipt in receipts if receipt is not None)
         if not result["runtime_removed"]:
             result["exit_code"] = result["exit_code"] or 1
+        launch.verify_pytest_config(result)
         full_arguments = all(argument in {"-q", "-v", "-vv", "--disable-warnings"} for argument in arguments)
         if (plan is not None and result["exit_code"] == 0 and result["completeness"]["complete"]
                 and result["runtime_removed"] and result.get("source_inputs_unchanged") is True
                 and full_arguments and plan.get("timing_update_eligible") is True
                 and not os.environ.get("PYTEST_ADDOPTS", "").strip()):
-            pending = timing_path.with_name(".backend-" + uuid4().hex + ".tmp")
-            try:
-                if any(part.is_symlink() or part.is_junction() for part in (timing_path, *timing_path.parents)):
-                    raise ValueError("Timing index must not use links.")
-                timing_path.parent.mkdir(parents=True, exist_ok=True)
-                value = {"version": 1, "environment": environment,
-                    "observation": {"result_path": str(result_path), "recorded_at": datetime.now(timezone.utc).isoformat(),
-                        "source_inputs_sha256": hashlib.sha256(json.dumps(plan["source_inputs"], sort_keys=True).encode()).hexdigest()},
-                    "node_seconds": observed_seconds}
-                payload = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-                evicted = 0
-                if len(payload) > TIMING_LIMIT:
-                    costs = {node: len(json.dumps({node: seconds}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) - 1
-                        for node, seconds in observed_seconds.items()}
-                    budget = TIMING_LIMIT - len(payload) + sum(costs.values())
-                    kept: dict[str, float] = {}
-                    for node, seconds in reversed(list(observed_seconds.items())):
-                        cost = costs[node]
-                        if cost <= budget:
-                            kept[node] = seconds
-                            budget -= cost
-                    evicted = len(observed_seconds) - len(kept)
-                    value["node_seconds"] = kept
-                    payload = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-                if len(payload) > TIMING_LIMIT:
-                    raise ValueError("Timing index metadata exceeds the 2 MiB limit.")
-                with pending.open("xb") as output:
-                    output.write(payload)
-                pending.replace(timing_path)
-                result["timing_index"].update(update_status="updated", size_bytes=len(payload), evicted_nodes=evicted)
-            except (OSError, ValueError) as error:
-                result["timing_index"].update(update_status="failed", update_error=str(error))
-            finally:
-                if pending.exists():
-                    try:
-                        pending.unlink()
-                    except OSError as error:
-                        result["timing_index"].update(pending_path=str(pending), cleanup_error=str(error))
+            update_timing_index(timing_path, result_path, result["timing_index"], environment,
+                                plan["source_inputs"], observed_seconds)
         result["finished_at"] = datetime.now(timezone.utc).isoformat()
         result["wall_seconds"] = monotonic() - started
-        with result_path.open("x", encoding="utf-8") as output:
-            json.dump(result, output, ensure_ascii=False, indent=2)
-            output.write("\n")
+        if result["exit_code"] in (2, 130):
+            state = "interrupted"
+        elif "collection" not in dispatched:
+            state = "startup_failed"
+        else:
+            state = "failed" if result["exit_code"] else "passed"
+        artifacts = [Path(lane["observation_path"]) for lane in result["lanes"].values() if "observation_path" in lane]
+        if "manifest_path" in result:
+            artifacts.append(Path(result["manifest_path"]))
+        launch.finish(result, state, not_run=sorted(groups.keys() - dispatched), required_artifacts=artifacts)
     return result

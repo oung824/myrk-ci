@@ -14,6 +14,12 @@ EVIDENCE_INDEXES = (
     ".scratch/workspace-cleanup-20261110/curated-acceptance.md",
     ".scratch/workspace-closeout-20261112/result.md",
 )
+EXPLICIT_DOCUMENTS = (
+    ".agents/skills/delete-comment/SKILL.md",
+    "tests/support/agent_acceptance/README.md",
+    "tests/acceptance/plans/README.md",
+    *EVIDENCE_INDEXES,
+)
 
 
 def markdown_body(text: str) -> str:
@@ -35,7 +41,7 @@ def check_navigation(root: Path) -> dict[str, object]:
     root = root.resolve()
     documents = sorted([
         *root.glob("*.md"), *(root / "docs").rglob("*.md"),
-        *(root / name for name in EVIDENCE_INDEXES if (root / name).is_file()),
+        *(root / name for name in EXPLICIT_DOCUMENTS if (root / name).is_file()),
     ])
     inputs = {document.relative_to(root).as_posix() for document in documents}
     targets: set[str] = set()

@@ -54,8 +54,11 @@ class SupervisorRuntime:
             if not kernel.GetProcessTimes(kernel.GetCurrentProcess(), *(ctypes.byref(value) for value in times)):
                 raise ctypes.WinError(ctypes.get_last_error())
             self.owner = {"pid": os.getpid(), "created_filetime": str((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime),
-                          "project_root": str(self.project_root), "purpose": "supervisor-runtime", "created_at": datetime.now(timezone.utc).isoformat(),
+                          "project_root": str(self.project_root), "source_root": str(source),
+                          "purpose": "supervisor-runtime", "created_at": datetime.now(timezone.utc).isoformat(),
                           "runtime_directory": str(self.directory)}
+            if task_id := os.environ.get("MYRK_TASK_ID"):
+                self.owner["task_id"] = task_id
             (self.directory / "owner.json").write_text(json.dumps(self.owner, ensure_ascii=False, indent=2), encoding="utf-8")
             self.capture()
         except (OSError, ValueError) as error:

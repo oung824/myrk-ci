@@ -28,6 +28,7 @@ def run_runtime(source: Path, script: str, **settings: str) -> subprocess.Comple
     environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "PYTHONIOENCODING": "utf-8",
                    "MYRK_EXECUTOR_PATH": str(source / "missing-executor.exe"), "TEMP": str(temporary), "TMP": str(temporary)}
     environment.pop("MYRK_RUNTIME_ROOT", None)
+    environment.pop("MYRK_TASK_ID", None)
     environment.update(settings)
     return subprocess.run([sys.executable, "-B", "-c", "import sys; sys.path.insert(0, sys.argv[1]);\n" + script, str(source)],
                           cwd=source.parent, env=environment, capture_output=True, text=True, encoding="utf-8", timeout=20,
@@ -49,7 +50,11 @@ print(json.dumps({"directory": str(directory), "removed": not directory.exists()
     assert facts["removed"] is True
 
 
-def test_runtime_persists_its_actual_process_identity_before_preparation(runtime_source: Path) -> None:
+@pytest.mark.parametrize("task_id", [None, "resource-closeout-supervisor"])
+def test_runtime_persists_its_actual_process_identity_before_preparation(
+    runtime_source: Path, task_id: str | None,
+) -> None:
+    settings = {"MYRK_TASK_ID": task_id} if task_id is not None else {}
     result = run_runtime(runtime_source, """from myrk.supervisor_runtime import SUPERVISOR_RUNTIME as runtime
 import ctypes, json, os
 from ctypes import wintypes
@@ -61,13 +66,16 @@ assert kernel.GetProcessTimes(kernel.GetCurrentProcess(), *(ctypes.byref(value) 
 owner = json.loads((runtime.directory / "owner.json").read_text(encoding="utf-8"))
 print(json.dumps({"owner": owner, "pid": os.getpid(), "created_filetime": str((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime),
                   "directory": str(runtime.directory), "preparation_failed": runtime.error is not None}))
-""")
+""", **settings)
     assert result.returncode == 0, result.stdout + result.stderr
     facts = json.loads(result.stdout)
     owner = facts["owner"]
     assert owner["pid"] == facts["pid"]
     assert owner["created_filetime"] == facts["created_filetime"]
     assert owner["project_root"] == str(runtime_source)
+    assert owner["source_root"] == str(runtime_source)
+    assert ("task_id" in owner) == (task_id is not None)
+    assert owner.get("task_id") == task_id
     assert owner["runtime_directory"] == facts["directory"]
     assert owner["purpose"] == "supervisor-runtime"
     assert owner["created_at"]
@@ -113,11 +121,12 @@ def test_git_worktree_uses_its_shared_repository_for_runtime_ownership(runtime_s
     destination = primary / ".scratch" / "owned-runtime"
     result = run_runtime(runtime_source, """from myrk.supervisor_runtime import SUPERVISOR_RUNTIME as runtime
 import json
-print(json.dumps({"project_root": str(runtime.project_root), "directory": str(runtime.directory)}))
+print(json.dumps({"owner": runtime.owner, "directory": str(runtime.directory)}))
 """, MYRK_RUNTIME_ROOT=str(destination))
     assert result.returncode == 0, result.stdout + result.stderr
     facts = json.loads(result.stdout)
-    assert Path(facts["project_root"]) == primary
+    assert Path(facts["owner"]["project_root"]) == primary
+    assert Path(facts["owner"]["source_root"]) == runtime_source
     assert Path(facts["directory"]).parent == destination
 
 
@@ -182,13 +191,16 @@ finally:
 runtime.close()
 facts.update({"recovered": not runtime.directory.exists(), "receipt_removed": not receipt.exists()})
 print(json.dumps(facts))
-""")
+""", MYRK_TASK_ID="resource-cleanup-supervisor")
     assert result.returncode == 0, result.stdout + result.stderr
     facts = json.loads(result.stdout)
     assert any("未能删除" in warning for warning in facts["warnings"])
     assert facts["remaining"] is True
     receipt = json.loads(facts["receipt"])
     assert receipt["owner"]["purpose"] == "supervisor-runtime"
+    assert receipt["owner"]["source_root"] == str(runtime_source)
+    assert receipt["owner"]["task_id"] == "resource-cleanup-supervisor"
+    assert receipt["owner"]["runtime_directory"] == receipt["runtime_directory"]
     assert receipt["error_type"] == "PermissionError"
     assert receipt["winerror"] == 32
     assert "synthetic-private-content" not in facts["receipt"]

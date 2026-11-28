@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       focus:
-        description: Run the four reproduced cases or each full file
+        description: Run the four reproduced cases, full files, or integrated runner checks
         type: choice
-        options: [cases, files]
+        options: [cases, files, integrated]
         default: cases
 
 permissions:
@@ -21,9 +21,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {name: action-reporting, group: executor-and-network, test_file: test_action_reporting_facts}
-          - {name: recovery, group: recovery, test_file: test_recovery}
-          - {name: acceptance-actions, group: synthetic-acceptance, test_file: acceptance/test_actions}
+          - {name: action-reporting, group: executor-and-network, test_file: test_action_reporting_facts, expected_count: '5'}
+          - {name: recovery, group: recovery, test_file: test_recovery, expected_count: '10'}
+          - {name: acceptance-actions, group: synthetic-acceptance, test_file: acceptance/test_actions, expected_count: '19'}
     defaults:
       run:
         shell: pwsh
@@ -48,8 +48,45 @@ jobs:
           MYRK_DIAGNOSTIC_GROUP: ${{ matrix.group }}
           MYRK_DIAGNOSTIC_FILE: ${{ matrix.test_file }}
           MYRK_DIAGNOSTIC_FOCUS: ${{ inputs.focus }}
+          MYRK_DIAGNOSTIC_COUNT: ${{ matrix.expected_count }}
         run: |
           $options = @()
           if ($env:MYRK_DIAGNOSTIC_FOCUS -eq 'cases') { $options += '--failed-cases-only' }
+          if ($env:MYRK_DIAGNOSTIC_FOCUS -eq 'integrated') { $options += @('--expected-count', $env:MYRK_DIAGNOSTIC_COUNT) }
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_DIAGNOSTIC_GROUP --diagnostic-file $env:MYRK_DIAGNOSTIC_FILE @options
+          exit $LASTEXITCODE
+
+  integrated-runner:
+    name: Check integrated runner ${{ matrix.scope }}
+    if: inputs.focus == 'integrated'
+    runs-on: windows-2025
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        scope: [scheduling, receipts]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up x64 Node.js for desktop receipt tests
+        if: matrix.scope == 'receipts'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.20.0'
+          architecture: x64
+          package-manager-cache: false
+      - name: Install locked Python dependencies
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-public
+      - name: Collect and run the selected runner tests
+        env:
+          MYRK_RUNNER_SCOPE: ${{ matrix.scope }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' "integrated-runner-$env:MYRK_RUNNER_SCOPE"
           exit $LASTEXITCODE

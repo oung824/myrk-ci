@@ -21,12 +21,15 @@ from tests.support.agent_acceptance.quality_packet import PACKETS, QualityPacket
 
 def candidate_probe(request_path: Path, output: Path) -> None:
     """Use the same public prepare/stage/review path from an owned SOURCE copy."""
+    from myrk.project_paths import project_root
     from tests.acceptance.test_candidate_refreeze import approve_candidate, PROMPT
     value=json.loads(request_path.read_bytes())
     root=Path(value['run_root'])
     plan=AcceptancePlan.model_validate(value['plan'])
     registry=builtin_registry(quality_packet=plan.quality_packet)
-    bundle=prepare_live(plan,root=root,registry=registry)
+    evaluator_directories=value['evaluator_isolation_directories']
+    bundle=prepare_live(plan,root=root,registry=registry,evaluator_isolation_directories=tuple(evaluator_directories))
+    assert all(bundle.execution[row.case_id]['evaluator_isolation_directories']==evaluator_directories for row in plan.executions)
     grant=LiveAuthorization(authorization_id='synthetic-quality-genesis',binding=bundle.binding,total_limit=16,
         case_limits={'tuning':8,'formal':8},total_microusd=235936,case_microusd={'tuning':117968,'formal':117968},
         transport='mock',parent_budget_id=plan.parent_budget.parent_id)
@@ -64,10 +67,18 @@ def candidate_probe(request_path: Path, output: Path) -> None:
         candidate=gate.propose_candidate()
         assert gate.accounting_report()['actual_http']==before['actual_http']
         current=approve_candidate(gate,candidate)
+        frozen_candidate=read_prepared_snapshot(root,binding=current.authorization.binding)
+        assert all(frozen_candidate.execution[row.case_id]['evaluator_isolation_directories']==evaluator_directories
+            for row in plan.executions)
         formal,result_root=execute(current,'formal')
         after=current.accounting_report()
         authorities=[json.loads((Path(path) if Path(path).is_absolute() else result_root/path).read_bytes())
             for path in formal['evidence'].values() if Path(path).name=='authorization.json']
+        original_manifest=Path(authorities[0]['scenario_root'])/'quality-task.json'
+        stored_manifest=formal['facts']['evidence_relocation'].get(str(original_manifest),original_manifest.name)
+        manifest_path=result_root/Path(formal['evidence'][stored_manifest])
+        denied_paths=json.loads(manifest_path.read_bytes())['denied_paths']
+        assert all(str(project_root(SOURCE)/path) in denied_paths for path in evaluator_directories)
         from tests.support.agent_acceptance.formal import verify_authority
         invalid=dict(authorities[0])
         invalid['scenario_root']=str(root/'.scratch'/('execution-'+uuid4().hex))
@@ -96,8 +107,10 @@ def test_quality_candidate_refreeze_reads_legal_inputs_on_the_original_parent(pr
     from myrk.project_paths import project_root
     identity=uuid4().hex
     packet_root=SOURCE/PACKETS/('candidate-quality-'+identity)
-    source_parent=project_root(SOURCE)/'.scratch/qsrc'
+    project=project_root(SOURCE)
+    source_parent=project/'.scratch/qsrc'
     controller=source_parent/identity
+    evaluator_directory=controller/'evaluator-review-copy'
     output=acceptance_public_root
     output.mkdir(parents=True)
     try:
@@ -116,6 +129,7 @@ def test_quality_candidate_refreeze_reads_legal_inputs_on_the_original_parent(pr
         files=bound_files(plan,registry)
         controller.mkdir(parents=True,exist_ok=False)
         (controller/'owner.json').write_text(json.dumps({'owner':'synthetic-quality-source-controller','identity':identity,'authority_created':False}),encoding='utf-8')
+        evaluator_directory.mkdir()
         with ZipFile(output/'controller-source-originals.zip','x',ZIP_DEFLATED) as archive:
             for name,expected in files.items():
                 body=(SOURCE/name).read_bytes()
@@ -125,7 +139,8 @@ def test_quality_candidate_refreeze_reads_legal_inputs_on_the_original_parent(pr
                 target.write_bytes(body)
                 archive.writestr(name,body)
         request=output/'probe-request.json'
-        request.write_text(json.dumps({'run_root':str(prepared_root),'plan':plan.model_dump(mode='json')}),encoding='utf-8')
+        request.write_text(json.dumps({'run_root':str(prepared_root),'plan':plan.model_dump(mode='json'),
+            'evaluator_isolation_directories':[evaluator_directory.relative_to(project).as_posix()]}),encoding='utf-8')
         process=subprocess.run([sys.executable,'-B','-m','tests.acceptance.test_quality_candidate_refreeze',str(request),str(output)],
             cwd=controller,env={**environment(output/'source-controller-environment'),'PYTHONPATH':str(controller)},capture_output=True)
         (output/'probe.stdout').write_bytes(process.stdout)

@@ -15,6 +15,7 @@ export async function runQualityGovernance({ authority, request, command, events
   const seen=new Set()
   const mockStop = request.governance_adapter === 'qg3-9' && authority.grant.transport === 'mock'
   const arrived = join(authority.scenario_root, 'governance-stop-arrived.json')
+  const missingStop = 'Missing governance stop target evidence'
   await command({action:'send',prompt:request.prompt,scope:request.scope})
   const deadline=Date.now()+180000
   while(!(await events()).some(item=>item.event==='finished')) {
@@ -56,12 +57,14 @@ export async function runQualityGovernance({ authority, request, command, events
       if (mockStop) await writeFile(join(authority.scenario_root, 'governance-stop-release.txt'), 'Accepted stop\n', { flag: 'wx' })
     }
     assert.ok(!all.some(item=>item.event==='error'&&item.fatal),JSON.stringify(all.filter(item=>item.event==='error')))
-    assert.ok(Date.now()<deadline,'Canonical governance task finishes through public Main')
+    assert.ok(Date.now()<deadline, mockStop && !state.stop_held_sdk_input_id
+      ? missingStop : 'Canonical governance task finishes through public Main')
     await pause(25)
   }
   const all=await events()
   const finished=all.findLast(item=>item.event==='finished')
   assert.equal(finished.saved,true)
+  if (mockStop) assert.ok(state.stop_held_sdk_input_id, missingStop)
   assert.equal(finished.turn.status,request.governance_adapter==='qg3-9'?'cancelled':'completed',finished.turn.error)
   const record=JSON.parse(await readFile(finished.path,'utf8'))
   for(const decision of state.approval_decisions) {

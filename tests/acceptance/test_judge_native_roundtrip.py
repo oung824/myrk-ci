@@ -5,7 +5,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from tests.acceptance.judge_test_material import judge_test_material
+from tests.acceptance.judge_test_material import judge_test_material, register_judge_parent_cleanup
 from tests.acceptance.test_judge_qualification import candidate, samples
 from tests.support.agent_acceptance import (
     AcceptancePlan,
@@ -79,18 +79,8 @@ def test_native_judge_sends_one_calibration_and_one_qualification(
         transport='mock', parent_budget_id=parent.parent_id,
     )
     gate = LiveGate(prepared_root, registry, grant)
-    parent_index = gate.parent_binding_path(parent.parent_id)
-    assert not parent_index.exists()
-
-    def release_parent_index():
-        if parent_index.exists():
-            assert parent_index.resolve(strict=True) == parent_index
-            record = json.loads(parent_index.read_bytes())
-            assert record['parent_id'] == parent.parent_id
-            assert Path(record['accounting_root']) == prepared_root
-            parent_index.unlink()
-
-    request.addfinalizer(release_parent_index)
+    register_judge_parent_cleanup(request, gate.parent_binding_path(parent.parent_id),
+                                  parent_id=parent.parent_id, accounting_root=prepared_root)
     for row in prerequisites:
         gate.for_execution(row.execution_id).finish_execution(CaseOutcome(
             'passed', {'provenance': 'synthetic prerequisite only; no SDK evidence'},

@@ -19,6 +19,9 @@ def install_check_observation() -> None:
     original = checks.subprocess.Popen
     directory = Path(os.environ["MYRK_PROCESS_RECEIPT_DIRECTORY"])
     directory.mkdir(parents=True, exist_ok=True)
+    case_directory = os.environ["MYRK_EXIT_CASE_DIRECTORY"]
+    config_path = Path(case_directory) / "check-config.json"
+    check_argv = [os.environ["MYRK_PYTHON"], "-u", "-m", "tests.exit_acceptance_fixture", "check", str(config_path)]
 
     async def verify_ancestry(process, identity, owner_observer: ProcessObserver) -> None:
         handled: set[Path] = set()
@@ -81,7 +84,6 @@ def install_check_observation() -> None:
         if argv != checks.SUPERVISOR_RUNTIME.command():
             return original(argv, *args, **kwargs)
         receipt = directory / f"process-supervisor-{uuid4().hex}.json"
-        kwargs["env"] = {**kwargs["env"], "MYRK_PROCESS_OWNER_FILE": str(receipt) + ".ack"}
         process = original(argv, *args, **kwargs)
         observer = ProcessObserver()
         try:
@@ -105,6 +107,22 @@ def install_check_observation() -> None:
             process.stdin.close()
             process.wait(timeout=5)
             raise
+        send_request = process.communicate
+
+        def communicate(request: bytes) -> tuple[bytes, bytes]:
+            command = json.loads(request)
+            if command["argv"] == check_argv:
+                config = {
+                    "MYRK_PROCESS_OWNER_FILE": str(receipt) + ".ack",
+                    "MYRK_PROCESS_RECEIPT_DIRECTORY": str(directory),
+                    "MYRK_TEST_NORMAL_EXIT_FLAG": os.environ["MYRK_TEST_NORMAL_EXIT_FLAG"],
+                    "MYRK_EXIT_CASE_DIRECTORY": case_directory,
+                }
+                with config_path.open("x", encoding="utf-8") as stream:
+                    json.dump(config, stream)
+            return send_request(request)
+
+        process.communicate = communicate
         return process
 
     checks.subprocess.Popen = launch

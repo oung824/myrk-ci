@@ -11,6 +11,8 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.deepseek import DeepSeekProvider
 
 from myrk.conversation import Conversation, Supplement, Task, TaskScope
+from myrk.provider import deepseek_model
+from tests.support.observed_http import observed_mock_transport
 
 
 def response(text: str = "已完成。", *, tool: str | None = None, arguments: dict | None = None, call_id: str = "call") -> httpx2.Response:
@@ -35,11 +37,10 @@ def test_tool_steps_append_latest_execution_facts_without_rewriting_sent_prefix(
         return response()
 
     async def run() -> None:
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
-            async with AsyncOpenAI(api_key="synthetic-only", base_url="https://api.deepseek.com", http_client=http, max_retries=0) as client:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
+            async with deepseek_model("synthetic-only", http_client=http) as model:
                 scope = TaskScope(root=str(tmp_path), allowed_actions=["read"], provider="deepseek", recipients=["deepseek"])
-                turn = await Conversation(tmp_path / "records" / "conversation.json").ask("读两次后回答", document=None, scope=scope,
-                    model=OpenAIChatModel("deepseek-flash", provider=DeepSeekProvider(openai_client=client)))
+                turn = await Conversation(tmp_path / "records" / "conversation.json").ask("读两次后回答", document=None, scope=scope, model=model)
                 assert turn.status == "completed", turn.error
                 assert turn.request_attempts[0].observation.wire.change_reasons == ["new_task"]
                 assert all(attempt.observation.wire.change_reasons == [] for attempt in turn.request_attempts[1:])
@@ -145,7 +146,7 @@ def test_same_task_rebuilds_stale_baseline_when_authorized_boundary_changes(tmp_
         return response()
 
     async def run() -> None:
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with AsyncOpenAI(api_key="synthetic-only", base_url="https://api.deepseek.com", http_client=http, max_retries=0) as client:
                 scope = TaskScope(root=str(tmp_path), allowed_actions=["read"], provider="deepseek", recipients=["deepseek"])
                 task = Task(goal="按当前允许范围回答", scope=scope)
@@ -185,7 +186,7 @@ def test_final_turn_records_the_actual_empty_tool_table_and_change_reason(tmp_pa
         return response(tool="memory", arguments={"action": "list"}) if len(sent) == 1 else response()
 
     async def run() -> None:
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with AsyncOpenAI(api_key="synthetic-only", base_url="https://api.deepseek.com", http_client=http, max_retries=0) as client:
                 task = Task(goal="最后一轮回答", scope=None, max_turns=2)
                 path = tmp_path / "record.json"
@@ -258,10 +259,9 @@ def test_retry_adopts_a_supplement_once_without_rebuilding_the_sent_prefix(tmp_p
 
     async def run() -> None:
         async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
-            async with AsyncOpenAI(api_key="synthetic-only", base_url="https://api.deepseek.com", http_client=http, max_retries=0) as client:
+            async with deepseek_model("synthetic-only", http_client=http) as model:
                 path = tmp_path / "record.json"
-                turn = await Conversation(path).ask(task.goal, document=None, task=task,
-                    model=OpenAIChatModel("deepseek-flash", provider=DeepSeekProvider(openai_client=client)))
+                turn = await Conversation(path).ask(task.goal, document=None, task=task, model=model)
                 assert turn.status == "completed", turn.error
                 assert task.requests == task.total_requests == 3 and task.turns_used == 2
                 assert [attempt.status for attempt in turn.request_attempts] == ["failed", "completed", "completed"]
@@ -289,7 +289,7 @@ def test_changed_project_guidance_is_effective_and_explains_the_new_layout(tmp_p
         return response()
 
     async def run() -> None:
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with AsyncOpenAI(api_key="synthetic-only", base_url="https://api.deepseek.com", http_client=http, max_retries=0) as client:
                 model = OpenAIChatModel("deepseek-flash", provider=DeepSeekProvider(openai_client=client))
                 scope = TaskScope(root=str(tmp_path), allowed_actions=["read"], provider="deepseek", recipients=["deepseek"])

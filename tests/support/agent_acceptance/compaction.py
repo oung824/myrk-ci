@@ -322,19 +322,17 @@ def classify_known_failure(outcome: CaseOutcome, symptom: str) -> None:
     outcome.facts.update(known_failure_matched=matched, fix_issue=".scratch/compaction-acceptance-defects-20261113/issues/02-window-reopen.md")
 
 
-def register(registry: CaseRegistry, *, include_original_materials: bool = True) -> None:
-    if include_original_materials:
-        from tests.support.agent_acceptance.compaction_continuity import summary_save_obstruction
-        registry.register(AcceptanceCase("compaction.summary-save-obstruction","compaction",("deepseek",),summary_save_obstruction,owner_ticket="14"))
+def register(registry: CaseRegistry) -> None:
+    from tests.support.agent_acceptance.compaction_continuity import summary_save_obstruction
+    registry.register(AcceptanceCase("compaction.summary-save-obstruction","compaction",("deepseek",),summary_save_obstruction,owner_ticket="14"))
     registry.register(AcceptanceCase("compaction.short", "compaction", PROTOCOLS, compact_and_reopen,
         bindings=(Path(__file__).with_name("compaction_review.py"),)))
     for name in ("long", "truncated", "service-failure", "interrupted", "missing-usage", "window-recovery"):
         registry.register(AcceptanceCase(f"compaction.{name}", "compaction", PROTOCOLS, summary_boundary,
             bindings=(Path(__file__).with_name("compaction_review.py"),)))
-    if include_original_materials:
-        for name in json.loads((MATERIALS / "inputs.json").read_text(encoding="utf-8-sig")):
-            registry.register(AcceptanceCase(f"compaction.semantic.{name}", "compaction-semantics", PROTOCOLS, semantic_material,
-                bindings=(MATERIALS / "inputs.json", MATERIALS / "criteria.json", Path(__file__).with_name("compaction_review.py"))))
+    for name in json.loads((MATERIALS / "inputs.json").read_text(encoding="utf-8-sig")):
+        registry.register(AcceptanceCase(f"compaction.semantic.{name}", "compaction-semantics", PROTOCOLS, semantic_material,
+            bindings=(MATERIALS / "inputs.json", MATERIALS / "criteria.json", Path(__file__).with_name("compaction_review.py"))))
     registry.register(AcceptanceCase("compaction.early-no-history", "compaction", ("deepseek",), early_no_history))
     registry.register(AcceptanceCase("compaction.window-reopen", "compaction", ("deepseek",), window_reopen))
     registry.register(AcceptanceCase("compaction.repeated", "compaction", PROTOCOLS, repeated_compaction,

@@ -14,7 +14,7 @@ test('runner initialization failures still record output and remove generated di
   const tests = join(source, 'desktop', 'tests')
   await mkdir(tests, { recursive: true })
   await mkdir(join(source, '.git'))
-  for (const name of ['run-tests.mjs', 'run-context.mjs', 'project-paths.mjs', 'test-timings.mjs']) {
+  for (const name of ['run-tests.mjs', 'run-context.mjs', 'project-paths.mjs', 'test-timings.mjs', 'test-receipts.mjs']) {
     await writeFile(join(tests, name), await readFile(join(current, name)))
   }
   const environment = { ...process.env }

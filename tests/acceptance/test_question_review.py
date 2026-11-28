@@ -6,16 +6,7 @@ from hashlib import sha256
 
 import pytest
 
-from tests.support.agent_acceptance import AcceptancePlan, CaseRegistry, OfflineSession, Reply, builtin_registry, run_plan
-from tests.support.agent_acceptance.catalogue import complete_catalogue
-from tests.support.agent_acceptance.ordinary import register
-
-
-def _ordinary_registry() -> CaseRegistry:
-    registry = CaseRegistry()
-    register(registry)
-    complete_catalogue(registry)
-    return registry
+from tests.support.agent_acceptance import AcceptancePlan, OfflineSession, Reply, builtin_registry, run_plan
 
 
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
@@ -24,7 +15,7 @@ def test_wrong_fact_is_a_product_failure_even_when_transport_and_evidence_work(t
         return OfflineSession(selected, [Reply(text="The result is 41.")], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.tool_status == "passed"
     assert case.product_status == case.target_status == case.deterministic_status == "failed"
@@ -41,7 +32,7 @@ def test_wrong_fact_is_a_product_failure_even_when_transport_and_evidence_work(t
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 def test_attachment_has_actual_read_only_approval_and_source_binding(tmp_path, protocol):
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.attachment"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry()))
+        root=tmp_path / "run", registry=builtin_registry()))
     case = result.cases[0]
     record = json.loads(case.evidence["conversation"].read_bytes())
     approval = record["turns"][0]["task"]["approval"]
@@ -57,7 +48,7 @@ def test_attachment_has_actual_read_only_approval_and_source_binding(tmp_path, p
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 def test_encoded_long_answer_keeps_original_bytes_and_complete_response(tmp_path, protocol, acceptance_public_root):
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.encoded-long"], protocols=[protocol]),
-        root=acceptance_public_root, registry=_ordinary_registry()))
+        root=acceptance_public_root, registry=builtin_registry()))
     case = result.cases[0]
     assert case.product_status == "passed", case.facts
     assert case.evidence["attachment"].read_bytes().startswith(b"\xef\xbb\xbf")
@@ -71,7 +62,7 @@ def test_review_export_import_preserves_originals_and_old_decisions(tmp_path, pr
     from tests.support.agent_acceptance import HumanReview, export_review, import_reviews, review_report
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry()))
+        root=tmp_path / "run", registry=builtin_registry()))
     original = result.result_path.read_bytes()
     package_path = export_review(result.result_path, tmp_path / "review-v1", final_reviewer="Final reviewer fixture")
     package = json.loads(package_path.read_bytes())
@@ -104,7 +95,7 @@ def test_case_review_leaves_critical_status_unknown_without_its_source_output(tm
     from tests.support.agent_acceptance import HumanReview, export_review, import_reviews
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"], protocols=["deepseek"]),
-        root=tmp_path / "run", registry=_ordinary_registry()))
+        root=tmp_path / "run", registry=builtin_registry()))
     original = json.loads(result.result_path.read_bytes())
     case = original["cases"][0]
     case["facts"]["output_critical_dimensions"] = {
@@ -205,7 +196,7 @@ def test_five_output_types_use_actual_sources_and_keep_domain_criteria(tmp_path,
 def test_review_cannot_pass_unknown_missing_evidence_or_ai_authorship(tmp_path):
     from tests.support.agent_acceptance import HumanReview, export_review, import_reviews
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.interrupted"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.interrupted"]), root=tmp_path / "run", registry=builtin_registry()))
     package_path = export_review(result.result_path, tmp_path / "review")
     package = json.loads(package_path.read_bytes())
     output = package["outputs"][0]
@@ -225,7 +216,7 @@ def test_review_cannot_pass_unknown_missing_evidence_or_ai_authorship(tmp_path):
 
 
 def test_catalogue_freezes_screening_caps_before_any_execution():
-    rows = {row["case_id"]: row for row in _ordinary_registry().catalogue()}
+    rows = {row["case_id"]: row for row in builtin_registry().catalogue()}
     assert rows["ordinary.question"]["screening"] == {"deepseek": {"scenario_id": "D01", "request_cap": 4}}
     assert rows["ordinary.attachment"]["screening"] == {"deepseek": {"scenario_id": "D02", "request_cap": 6}, "google": {"scenario_id": "G01", "request_cap": 6}}
     assert rows["ordinary.encoded-long"]["screening"] == {"deepseek": {"scenario_id": "D03", "request_cap": 12}}
@@ -248,7 +239,7 @@ def test_correct_facts_and_recovered_transport_still_need_content_review(tmp_pat
         return OfflineSession(selected, [Reply(status=503), Reply(text="6 × 7 = 42.\n")], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.product_status == case.target_status == case.deterministic_status == "passed"
     assert case.case_status == "pending_review"
@@ -259,7 +250,7 @@ def test_correct_facts_and_recovered_transport_still_need_content_review(tmp_pat
 def test_final_reviewer_resolves_disagreement_without_hiding_later_reviews(tmp_path):
     from tests.support.agent_acceptance import HumanReview, export_review, import_reviews, review_report
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=builtin_registry()))
     package_path = export_review(result.result_path, tmp_path / "review", final_reviewer="Final form fixture")
     package = json.loads(package_path.read_bytes())
     output = package["outputs"][0]
@@ -292,7 +283,7 @@ def test_review_cli_exports_the_same_pending_originals(tmp_path):
     import subprocess
     import sys
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=builtin_registry()))
     exported = subprocess.run([sys.executable, "-B", "-m", "tests.support.agent_acceptance", "export-review",
         str(result.result_path), str(tmp_path / "review")], check=False, capture_output=True, text=True, encoding="utf-8")
     assert exported.returncode == 0, exported.stderr
@@ -306,7 +297,7 @@ def test_review_cli_exports_the_same_pending_originals(tmp_path):
 def test_export_rejects_an_original_changed_after_the_run(tmp_path):
     from tests.support.agent_acceptance import export_review
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=builtin_registry()))
     exchange = result.cases[0].evidence["exchange"]
     exchange.write_text(exchange.read_text(encoding="utf-8").replace("The result is 42.", "The result is 41."), encoding="utf-8")
     with pytest.raises(ValueError, match="original"):
@@ -316,7 +307,7 @@ def test_export_rejects_an_original_changed_after_the_run(tmp_path):
 def test_import_rejects_two_different_decisions_with_the_same_id(tmp_path):
     from tests.support.agent_acceptance import HumanReview, export_review, import_reviews, review_report
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=builtin_registry()))
     package_path = export_review(result.result_path, tmp_path / "review")
     package = json.loads(package_path.read_bytes())
     output = package["outputs"][0]
@@ -334,7 +325,7 @@ def test_import_rejects_two_different_decisions_with_the_same_id(tmp_path):
 def test_new_standard_keeps_old_package_and_rejects_false_not_applicable(tmp_path):
     from tests.support.agent_acceptance import HumanReview, export_review, import_reviews, review_report
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=builtin_registry()))
     original = result.result_path.read_bytes()
     first = export_review(result.result_path, tmp_path / "v1")
     first_bytes = first.read_bytes()
@@ -372,7 +363,7 @@ def test_long_stream_interruption_keeps_partial_output_and_failure(tmp_path, pro
         return OfflineSession(selected, [Reply(tool="read_authorized_text"), *[Reply(text="PARTIAL-ORIGINAL-7319", interrupt=True)] * 3], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.encoded-long"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.tool_status == "passed", case.facts
     assert case.target_status == case.case_status == "failed"
@@ -387,7 +378,7 @@ def test_long_stream_interruption_keeps_partial_output_and_failure(tmp_path, pro
 def test_one_import_cannot_contain_two_final_resolutions(tmp_path):
     from tests.support.agent_acceptance import HumanReview, export_review, import_reviews, review_report
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=builtin_registry()))
     package_path = export_review(result.result_path, tmp_path / "review", final_reviewer="Final form fixture")
     package = json.loads(package_path.read_bytes())
     output = package["outputs"][0]
@@ -450,7 +441,7 @@ def test_native_response_view_drives_output_units_after_real_sdk_decoding(tmp_pa
             return actual
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=NativeTransport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=NativeTransport))
     case = result.cases[0]
     assert case.product_status == "passed", case.facts
     assert case.facts["answer"] == "The result is 42."
@@ -469,7 +460,7 @@ def test_native_response_view_drives_output_units_after_real_sdk_decoding(tmp_pa
 def test_uncontested_failure_is_not_hidden_by_an_unknown_dimension(tmp_path):
     from tests.support.agent_acceptance import HumanReview, export_review, import_reviews
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=builtin_registry()))
     path = export_review(result.result_path, tmp_path / "review")
     package = json.loads(path.read_bytes()); output = package["outputs"][0]
     form = HumanReview(review_id="mixed-form", output_id=output["output_id"], reviewer="Named form fixture", authorship="human",
@@ -486,7 +477,7 @@ def test_uncontested_failure_is_not_hidden_by_an_unknown_dimension(tmp_path):
 def test_reexport_keeps_the_final_failure_and_its_original_history(tmp_path):
     from tests.support.agent_acceptance import HumanReview, export_review, import_reviews, review_report
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=builtin_registry()))
     first_path = export_review(result.result_path, tmp_path / "first", final_reviewer="Final form fixture")
     package = json.loads(first_path.read_bytes()); output = package["outputs"][0]
     first = HumanReview(review_id="failed-original", output_id=output["output_id"], reviewer="Named form fixture", authorship="human",
@@ -518,7 +509,7 @@ def test_export_rejects_unsupported_repeated_execution_shapes_before_writing(tmp
     import copy
     from tests.support.agent_acceptance import export_review
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question", "ordinary.attachment"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question", "ordinary.attachment"]), root=tmp_path / "run", registry=builtin_registry()))
     saved = json.loads(result.result_path.read_bytes())
     if duplicate == "case-protocol":
         row = copy.deepcopy(saved["cases"][0]); row["execution_id"] += "-other"
@@ -535,7 +526,7 @@ def test_result_save_rejects_repeated_case_protocol_before_coverage_can_overwrit
     import copy
     from tests.support.agent_acceptance import SharedControlError
 
-    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=_ordinary_registry()))
+    result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]), root=tmp_path / "run", registry=builtin_registry()))
     original = result.result_path.read_bytes()
     result.cases.append(copy.deepcopy(result.cases[0]))
     with pytest.raises(SharedControlError, match="Repeated"):
@@ -550,7 +541,7 @@ def test_question_explicit_denial_is_not_a_pass(tmp_path, protocol):
         return OfflineSession(selected, [Reply(text="Six times seven is not 42.")], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.tool_status == "passed"
     assert case.product_status == case.target_status == case.deterministic_status == case.case_status == "failed"
@@ -565,7 +556,7 @@ def test_attachment_explicit_denial_does_not_override_actual_source(tmp_path, pr
         return OfflineSession(selected, [replace(reply, text="The threshold is not 800. [purchase.md:1]") if reply.text else reply for reply in replies], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.attachment"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.tool_status == "passed"
     assert case.facts["source"]["native_input_ids"]
@@ -578,7 +569,7 @@ def test_wrong_equation_is_not_saved_by_the_correct_number(tmp_path, protocol):
         return OfflineSession(selected, [Reply(text="6 + 7 = 42.")], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     assert result.cases[0].product_status == result.cases[0].deterministic_status == "failed"
 
 
@@ -588,7 +579,7 @@ def test_a_number_mention_without_a_clear_assertion_remains_pending(tmp_path, pr
         return OfflineSession(selected, [Reply(text="There are 42 possible answers.")], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.product_status == "inconclusive"
     assert case.target_status == case.case_status == "pending_review"
@@ -605,7 +596,7 @@ def test_long_answer_accepts_equivalent_encoding_wording(tmp_path, protocol):
         return OfflineSession(selected, [replace(reply, text=reply.text.replace("UTF-8 with BOM", "UTF-8 BOM")) if reply.text else reply for reply in replies], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.encoded-long"], protocols=[protocol]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.product_status == case.target_status == case.deterministic_status == "passed", case.facts
     assert case.facts["response_complete"] is True
@@ -646,7 +637,7 @@ def test_long_result_keeps_required_structure_and_byte_facts(tmp_path, damage):
         return OfflineSession(selected, changed, config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.encoded-long"]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.product_status == case.target_status == case.deterministic_status == "failed", case.facts
     assert case.facts["source"]["unchanged"] is True
@@ -668,7 +659,7 @@ def test_long_result_allows_equivalent_numbering_body_and_valid_source_line(tmp_
         return OfflineSession(selected, changed, config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.encoded-long"]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.product_status == case.target_status == case.deterministic_status == "passed", case.facts
     assert case.facts["numbered_lines"] == 120
@@ -687,7 +678,7 @@ def test_complex_quoted_claims_require_review_without_false_failure(tmp_path, ca
         return OfflineSession(selected, [replace(reply, text=answer) if reply.text else reply for reply in replies], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=[case_id]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.product_status == "inconclusive", case.facts
     assert case.facts["goal_program_contract_passed"] is True
@@ -703,7 +694,7 @@ def test_named_review_closes_only_semantic_uncertainty_with_complete_program_fac
         return OfflineSession(selected, [Reply(text="Multiplying the two values gives the answer: forty-two.")], config=config)
 
     result = asyncio.run(run_plan(AcceptancePlan(cases=["ordinary.question"]),
-        root=tmp_path / "run", registry=_ordinary_registry(), session_factory=transport))
+        root=tmp_path / "run", registry=builtin_registry(), session_factory=transport))
     case = result.cases[0]
     assert case.product_status == "inconclusive"
     original_case = json.loads(result.result_path.read_bytes())

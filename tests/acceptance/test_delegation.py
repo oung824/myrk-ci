@@ -51,7 +51,7 @@ def test_child_delivers_real_file_parent_reads_back_and_checks_final_bytes(run_r
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 def test_skill_body_and_attachment_are_read_only_after_selection_without_scope_expansion(run_root, protocol):
     registry = CaseRegistry()
-    register(registry, include_delivery_materials=False)
+    register(registry)
     case = asyncio.run(run_plan(AcceptancePlan(cases=["skills.selected"], protocols=[protocol]),
                                root=run_root, registry=registry)).cases[0]
     assert case.product_status == "passed", case.facts
@@ -66,7 +66,7 @@ def test_skill_body_and_attachment_are_read_only_after_selection_without_scope_e
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 def test_extension_discovery_and_call_keep_exact_schema_and_approval_boundary(run_root, protocol, name):
     registry = CaseRegistry()
-    register(registry, include_delivery_materials=False)
+    register(registry)
     case = asyncio.run(run_plan(AcceptancePlan(cases=[f"extensions.{name}"], protocols=[protocol]),
                                root=run_root, registry=registry)).cases[0]
     assert case.product_status == "passed", case.facts
@@ -91,7 +91,7 @@ def test_extension_discovery_and_call_keep_exact_schema_and_approval_boundary(ru
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 def test_child_service_and_budget_facts_keep_actual_request_owner(run_root, protocol, name):
     registry = CaseRegistry()
-    register(registry, include_delivery_materials=False)
+    register(registry)
     case = asyncio.run(run_plan(AcceptancePlan(cases=[f"delegation.{name}"], protocols=[protocol]),
                                root=run_root, registry=registry)).cases[0]
     assert case.product_status == "passed", case.facts
@@ -126,7 +126,7 @@ def test_child_service_and_budget_facts_keep_actual_request_owner(run_root, prot
 @pytest.mark.parametrize("name", ["scope-folder-denied", "scope-actions-denied", "scope-check-denied", "scope-receiver-denied", "child-action-denied"])
 def test_delegation_cannot_widen_parent_authorization_or_its_narrower_child_scope(run_root, name):
     registry = CaseRegistry()
-    register(registry, include_delivery_materials=False)
+    register(registry)
     case = asyncio.run(run_plan(AcceptancePlan(cases=[f"delegation.{name}"]), root=run_root, registry=registry)).cases[0]
     assert case.product_status == "passed", case.facts
     assert case.facts["unchanged"] is True
@@ -144,7 +144,7 @@ def test_delegation_cannot_widen_parent_authorization_or_its_narrower_child_scop
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 def test_stopping_parent_waits_for_real_child_program_cleanup_and_sends_nothing_more(run_root, protocol):
     registry = CaseRegistry()
-    register(registry, include_delivery_materials=False)
+    register(registry)
     case = asyncio.run(run_plan(AcceptancePlan(cases=["delegation.stop"], protocols=[protocol]), root=run_root, registry=registry)).cases[0]
     assert case.product_status == "passed", case.facts
     assert case.facts["turn_status"] == case.facts["child_status"] == "cancelled"
@@ -188,7 +188,7 @@ def test_correct_artifact_cannot_hide_scripted_false_acceptance_claims(run_root,
 @pytest.mark.parametrize("protocol", ["deepseek", "openai-chat", "google"])
 def test_plan_can_be_selected_and_revised_without_executing_its_steps(run_root, protocol):
     registry = CaseRegistry()
-    register(registry, include_delivery_materials=False)
+    register(registry)
     case = asyncio.run(run_plan(AcceptancePlan(cases=["plans.update"], protocols=[protocol]), root=run_root, registry=registry)).cases[0]
     assert case.product_status == "passed", case.facts
     assert case.facts["plan_updates"] == [["Read the rule", "Propose a change"], ["Keep the read-only rule", "Wait for user acceptance"]]

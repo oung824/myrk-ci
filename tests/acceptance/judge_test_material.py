@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from pytest import FixtureRequest
+
 from myrk.check_plugin import project_test_directory
 
 
@@ -27,3 +29,17 @@ def judge_test_material(source: Path) -> Iterator[Path]:
             )
             (root / "owner.json").write_text(json.dumps(owner, indent=2) + "\n", encoding="utf-8")
         yield root
+
+
+def register_judge_parent_cleanup(request: FixtureRequest, index: Path, *, parent_id: str, accounting_root: Path) -> None:
+    assert not index.exists()
+
+    def release() -> None:
+        if index.exists():
+            assert index.resolve(strict=True) == index
+            record = json.loads(index.read_bytes())
+            assert record["parent_id"] == parent_id
+            assert Path(record["accounting_root"]) == accounting_root
+            index.unlink()
+
+    request.addfinalizer(release)

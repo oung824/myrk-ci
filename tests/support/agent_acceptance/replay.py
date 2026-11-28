@@ -1,10 +1,11 @@
 """Only the external HTTP/model boundary is replaced; SDKs and Myrk remain real."""
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterator
 import asyncio
 from base64 import b64encode
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager, contextmanager
 from contextvars import ContextVar
+from copy import deepcopy
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
@@ -22,12 +23,23 @@ from pydantic_ai.models import Model, ModelRequestParameters, StreamedResponse
 from pydantic_ai.models.wrapper import WrapperModel
 from pydantic_ai.settings import ModelSettings
 
+from myrk.observed_http import ObservedHTTPTransport
 from myrk.provider import ProviderConfig, configured_model
 from myrk.request_observation import current_request_attempt
 from tests.support.agent_acceptance.core import Protocol, SharedControlError
+from tests.support.agent_acceptance.preparation_models import digest
 from tests.support.agent_acceptance.recorded_response import capture_response_metadata
 
 active_sdk_input: ContextVar[str | None] = ContextVar("acceptance_sdk_input", default=None)
+_active_sdk_input_digest: ContextVar[str | None] = ContextVar("acceptance_sdk_input_digest", default=None)
+
+
+def matches_active_sdk_input(record: dict[str, Any]) -> bool:
+    expected = _active_sdk_input_digest.get()
+    try:
+        return expected is not None and digest(record) == expected
+    except (TypeError, ValueError):
+        return False
 
 
 @dataclass(frozen=True)
@@ -88,37 +100,41 @@ class SDKCapture(WrapperModel):
         attempt = current_request_attempt()
         identity = uuid4().hex
         judge = self.judge_call(identity)
-        self.inputs.append({"messages": ModelMessagesTypeAdapter.dump_python(messages, mode="json"),
-            "settings": settings, "parameters": json.loads(to_json(parameters)),
+        record = {"messages": ModelMessagesTypeAdapter.dump_python(messages, mode="json"),
+            "settings": deepcopy(settings), "parameters": json.loads(to_json(parameters)),
             "sdk_input_id": identity,
             "request_identity": {name: getattr(attempt, name) for name in
-                ("number", "actor", "purpose", "delegation_id")} if attempt is not None else judge.request_identity if judge is not None else None})
+                ("number", "actor", "purpose", "delegation_id")} if attempt is not None else judge.request_identity if judge is not None else None}
+        _active_sdk_input_digest.set(digest(record))
+        self.inputs.append(record)
         return identity
 
-    async def request(self, messages: list[ModelMessage], model_settings: ModelSettings | None, model_request_parameters: ModelRequestParameters) -> ModelResponse:
-        previous = active_sdk_input.get()
-        identity = self.capture(messages, model_settings, model_request_parameters)
-        active_sdk_input.set(identity)
-        judge_token = active_judge_call.set(self.judge_call(identity))
+    @contextmanager
+    def _bind_input(self, messages: list[ModelMessage], settings: ModelSettings | None,
+                    parameters: ModelRequestParameters) -> Iterator[None]:
+        digest_token = _active_sdk_input_digest.set(None)
+        sdk_token = active_sdk_input.set(None)
+        judge_token = active_judge_call.set(None)
         try:
-            return await self.wrapped.request(messages, model_settings, model_request_parameters)
+            identity = self.capture(messages, settings, parameters)
+            active_sdk_input.set(identity)
+            active_judge_call.set(self.judge_call(identity))
+            yield
         finally:
-            active_sdk_input.set(previous)
             active_judge_call.reset(judge_token)
+            active_sdk_input.reset(sdk_token)
+            _active_sdk_input_digest.reset(digest_token)
+
+    async def request(self, messages: list[ModelMessage], model_settings: ModelSettings | None, model_request_parameters: ModelRequestParameters) -> ModelResponse:
+        with self._bind_input(messages, model_settings, model_request_parameters):
+            return await self.wrapped.request(messages, model_settings, model_request_parameters)
 
     @asynccontextmanager
     async def request_stream(self, messages: list[ModelMessage], model_settings: ModelSettings | None,
                              model_request_parameters: ModelRequestParameters, run_context: RunContext[Any] | None = None) -> AsyncIterator[StreamedResponse]:
-        previous = active_sdk_input.get()
-        identity = self.capture(messages, model_settings, model_request_parameters)
-        active_sdk_input.set(identity)
-        judge_token = active_judge_call.set(self.judge_call(identity))
-        try:
+        with self._bind_input(messages, model_settings, model_request_parameters):
             async with self.wrapped.request_stream(messages, model_settings, model_request_parameters, run_context) as response:
                 yield response
-        finally:
-            active_sdk_input.set(previous)
-            active_judge_call.reset(judge_token)
 
 
 class _ReplyStream(httpx2.AsyncByteStream):
@@ -274,7 +290,7 @@ class OfflineSession:
             transport = _AuthorizedTransport(self.gate, self.case_id, self, "receiver",
                 self.terminal_transport or httpx2.MockTransport(fixture.respond), observe_stop, local_failure,
                 fault_origin="planned local pre-send failure from fixed_fixture")
-        async with httpx2.AsyncClient(transport=transport, trust_env=False) as client:
+        async with httpx2.AsyncClient(transport=ObservedHTTPTransport(transport), trust_env=False) as client:
             async with configured_model("acceptance-synthetic-only", self.config, http_client=client) as model:
                 yield SDKCapture(model, self.sdk_inputs,judge_purpose=self.judge_purpose,execution_id=self.execution_id)
 

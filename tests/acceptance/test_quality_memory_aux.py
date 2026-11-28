@@ -63,7 +63,7 @@ def test_auxiliary_memory_task_reaches_actual_main_with_its_frozen_packet(auxili
         startpoint='synthetic-main:'+task_id,order=1,stage='quality',request_cap=16,cost_cap_microusd=235936)
     plan=AcceptancePlan(executions=(row,),parent_budget=parent,quality_packet=auxiliary_packet,mode='prepare-live')
     registry=builtin_registry(quality_packet=auxiliary_packet)
-    bundle=prepare_live(plan,root=prepared_root,registry=registry)
+    bundle=prepare_live(plan,root=prepared_root,registry=registry, evaluator_isolation_directories=())
     grant=LiveAuthorization(authorization_id='synthetic-memory-aux-main',binding=bundle.binding,total_limit=16,case_limits={row.execution_id:16},
         total_microusd=235936,case_microusd={row.execution_id:235936},transport='mock',parent_budget_id=parent.parent_id)
     root=acceptance_public_root

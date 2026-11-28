@@ -3,7 +3,14 @@ import { access, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from 'vitest'
 import { testDirectory } from '../../tests/run-context.mjs'
-import { openOfficePreview } from './office-preview'
+import { OFFICE_PREVIEW_CLEANUP_TIMEOUT_MS, OFFICE_PREVIEW_CONVERSION_TIMEOUT_MS, openOfficePreview } from './office-preview'
+
+const TEST_OVERHEAD_PER_ATTEMPT_MS = 15_000
+
+function officePreviewTestTimeout(attempts: number): number {
+  const attemptTimeoutMs = OFFICE_PREVIEW_CONVERSION_TIMEOUT_MS + OFFICE_PREVIEW_CLEANUP_TIMEOUT_MS + TEST_OVERHEAD_PER_ATTEMPT_MS
+  return attempts * attemptTimeoutMs
+}
 
 test('legacy and macro Office files are rejected before any application is opened', async () => {
   const directory = await testDirectory('office-preview-unsupported-')
@@ -56,7 +63,7 @@ test.runIf(process.platform === 'win32')('a real fixed DOCX snapshot becomes a l
   expect(await readFile(sourcePath)).toEqual(original)
   await preview.close()
   await expect(access(join(directory, 'preview'))).rejects.toThrow()
-}, 60000)
+}, officePreviewTestTimeout(1))
 
 test.runIf(process.platform === 'win32')('real workbook preview exposes both visible sheets and excludes hidden sheets', async () => {
   const directory = await testDirectory('office-preview-workbook-')
@@ -74,7 +81,7 @@ test.runIf(process.platform === 'win32')('real workbook preview exposes both vis
   for (const section of preview.sections) expect((await readFile(section.pdfPath)).subarray(0, 5).toString()).toBe('%PDF-')
   expect(await readFile(sourcePath)).toEqual(original)
   await preview.close()
-}, 60000)
+}, officePreviewTestTimeout(1))
 
 
 test.runIf(process.platform === 'win32')('real slides retain separate local pages including an embedded chart', async () => {
@@ -90,7 +97,7 @@ test.runIf(process.platform === 'win32')('real slides retain separate local page
   } finally {
     await preview.close()
   }
-}, 120000)
+}, officePreviewTestTimeout(1))
 
 test.runIf(process.platform === 'win32')('disguised macro content is rejected and the failed preview directory is released', async () => {
   const directory = await testDirectory('office-preview-macro-')
@@ -98,14 +105,14 @@ test.runIf(process.platform === 'win32')('disguised macro content is rejected an
   await writeFile(sourcePath, officePackage({ ...minimalWord, 'word/vbaProject.bin': 'synthetic disabled payload' }))
   await expect(openOfficePreview({ sourcePath, directory: join(directory, 'preview') })).rejects.toThrow('rejects macros')
   await expect(access(join(directory, 'preview'))).rejects.toThrow()
-})
+}, officePreviewTestTimeout(1))
 
 test.runIf(process.platform === 'win32')('external relationships are rejected including XML encoded attribute values', async () => {
   const directory = await testDirectory('office-preview-external-')
   const sourcePath = join(directory, 'sample.docx')
   await writeFile(sourcePath, officePackage({ ...minimalWord, 'word/_rels/document.xml.rels': '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="https://example.invalid/never-fetch.png" TargetMode="Exter&#110;al"/></Relationships>' }))
   await expect(openOfficePreview({ sourcePath, directory: join(directory, 'preview') })).rejects.toThrow('rejects macros and external links')
-})
+}, officePreviewTestTimeout(1))
 
 test.runIf(process.platform === 'win32')('cancelling a real Office conversion releases its instance and preview directory', async () => {
   const directory = await testDirectory('office-preview-cancel-')
@@ -125,4 +132,4 @@ test.runIf(process.platform === 'win32')('cancelling a real Office conversion re
   } finally {
     await nextPreview.close()
   }
-}, 240000)
+}, officePreviewTestTimeout(2))

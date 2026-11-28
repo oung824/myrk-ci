@@ -4,9 +4,11 @@ from collections.abc import Iterator
 from datetime import datetime, timezone
 import hashlib
 import json
+import math
 from pathlib import Path, PurePosixPath
 import stat
-from typing import NoReturn, TypedDict, cast
+from typing import Any, NoReturn, TypedDict, cast
+from uuid import uuid4
 
 import pytest
 
@@ -292,3 +294,80 @@ class ShardPlugin:
 
     def pytest_unconfigure(self) -> None:
         self.save_observation()
+
+
+def read_observation(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if (not isinstance(value, dict) or not isinstance(value.get("selected_nodeids"), list)
+            or not all(isinstance(node, str) for node in value["selected_nodeids"])
+            or not isinstance(value.get("reports"), list)
+            or any(not isinstance(item, dict) or any(not isinstance(item.get(key), str)
+                for key in ("nodeid", "when", "outcome"))
+                or item["outcome"] not in {"passed", "failed", "skipped"}
+                or type(item.get("duration")) not in (int, float) or not math.isfinite(item["duration"])
+                or item["duration"] < 0 for item in value["reports"])):
+        raise ValueError("Invalid shard observation schema.")
+    return value
+
+
+TIMING_LIMIT = 2 * 1024 ** 2
+
+
+def read_timings(path: Path, project: Path) -> dict[str, Any]:
+    """Read optional timing hints at the project-owned filesystem boundary."""
+    if (".." in path.parts or any(part.is_symlink() or part.is_junction() for part in (path, *path.parents))
+            or not path.resolve().is_relative_to(project) or not stat.S_ISREG(path.stat().st_mode)
+            or path.stat().st_size > TIMING_LIMIT):
+        raise ValueError("Timings must be an ordinary project-local file of at most 2 MiB.")
+    value = json.loads(path.read_text(encoding="utf-8"))
+    entries = value.get("node_seconds") if isinstance(value, dict) else None
+    if (not isinstance(entries, dict) or any(not isinstance(node, str) or not node or "\\" in node.partition("::")[0]
+            or Path(node.partition("::")[0]).is_absolute() or ".." in Path(node.partition("::")[0]).parts
+            or type(seconds) not in (int, float) or not math.isfinite(seconds) or seconds < 0
+            for node, seconds in entries.items())):
+        raise ValueError("Timing node_seconds must map relative test identities to finite nonnegative durations.")
+    return cast(dict[str, Any], value)
+
+
+def update_timing_index(
+    timing_path: Path, result_path: Path, index: dict[str, Any], environment: dict[str, Any],
+    source_inputs: dict[str, str], observed_seconds: dict[str, float],
+) -> None:
+    pending = timing_path.with_name(".backend-" + uuid4().hex + ".tmp")
+    try:
+        if any(part.is_symlink() or part.is_junction() for part in (timing_path, *timing_path.parents)):
+            raise ValueError("Timing index must not use links.")
+        timing_path.parent.mkdir(parents=True, exist_ok=True)
+        value = {"version": 1, "environment": environment,
+            "observation": {"result_path": str(result_path), "recorded_at": datetime.now(timezone.utc).isoformat(),
+                "source_inputs_sha256": hashlib.sha256(json.dumps(source_inputs, sort_keys=True).encode()).hexdigest()},
+            "node_seconds": observed_seconds}
+        payload = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        evicted = 0
+        if len(payload) > TIMING_LIMIT:
+            costs = {node: len(json.dumps({node: seconds}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) - 1
+                for node, seconds in observed_seconds.items()}
+            budget = TIMING_LIMIT - len(payload) + sum(costs.values())
+            kept: dict[str, float] = {}
+            for node, seconds in reversed(list(observed_seconds.items())):
+                cost = costs[node]
+                if cost <= budget:
+                    kept[node] = seconds
+                    budget -= cost
+            evicted = len(observed_seconds) - len(kept)
+            value["node_seconds"] = kept
+            payload = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        if len(payload) > TIMING_LIMIT:
+            raise ValueError("Timing index metadata exceeds the 2 MiB limit.")
+        with pending.open("xb") as output:
+            output.write(payload)
+        pending.replace(timing_path)
+        index.update(update_status="updated", size_bytes=len(payload), evicted_nodes=evicted)
+    except (OSError, ValueError) as error:
+        index.update(update_status="failed", update_error=str(error))
+    finally:
+        if pending.exists():
+            try:
+                pending.unlink()
+            except OSError as error:
+                index.update(pending_path=str(pending), cleanup_error=str(error))

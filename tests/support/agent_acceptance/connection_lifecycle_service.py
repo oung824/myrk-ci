@@ -12,6 +12,7 @@ from pydantic_ai import models
 from pydantic_ai.models import Model
 
 from myrk.desktop_service import serve
+from myrk.observed_http import ObservedHTTPTransport
 from myrk.provider import deepseek_model
 from tests.support.agent_acceptance.replay import OfflineSession, Reply, SDKCapture
 from tests.support.agent_acceptance.resume_service import ReplayClient
@@ -59,7 +60,7 @@ async def main() -> None:
     setattr(httpx2.HTTPTransport,"handle_request",reject_sync)
     if receipts := os.environ.get("MYRK_PROCESS_RECEIPT_DIRECTORY"):
         write_process_receipt(Path(receipts),__file__)
-    client = ReplayClient(transport=httpx2.MockTransport(respond),trust_env=False)
+    client = ReplayClient(transport=ObservedHTTPTransport(httpx2.MockTransport(respond)),trust_env=False)
     @asynccontextmanager
     async def factory(key: str) -> AsyncIterator[Model]:
         async with deepseek_model(key,http_client=client) as model:

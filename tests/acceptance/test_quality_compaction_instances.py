@@ -50,7 +50,7 @@ def test_qg6_long_context_source_sequences_use_registered_native_prompts(prepare
         identity = f"quality:deepseek:{task_id}:1"
         execution = next(row for row in proposal.executions if row.execution_id == identity).model_copy(update={"order": 1})
         plan = AcceptancePlan(executions=(execution,), parent_budget=parent, quality_packet=reference, mode="offline")
-        bundle = prepare_live(plan.model_copy(update={"mode": "prepare-live"}), root=prepared_root, registry=registry)
+        bundle = prepare_live(plan.model_copy(update={"mode": "prepare-live"}), root=prepared_root, registry=registry, evaluator_isolation_directories=())
         grant = LiveAuthorization(authorization_id="synthetic-qg6-explicit", binding=bundle.binding, total_limit=60,
             case_limits={row.execution_id: row.request_cap for row in plan.executions}, total_microusd=884760,
             case_microusd={row.execution_id: row.cost_cap_microusd for row in plan.executions},
@@ -162,7 +162,7 @@ def test_qg6_reopen_keeps_used_capacity_recovery_and_does_not_replay_sources(pre
         identity = "quality:deepseek:QG6.formal.10:1"
         execution = next(row for row in proposal.executions if row.execution_id == identity).model_copy(update={"order": 1})
         plan = AcceptancePlan(executions=(execution,), parent_budget=parent, quality_packet=reference, mode="offline")
-        bundle = prepare_live(plan.model_copy(update={"mode": "prepare-live"}), root=prepared_root, registry=registry)
+        bundle = prepare_live(plan.model_copy(update={"mode": "prepare-live"}), root=prepared_root, registry=registry, evaluator_isolation_directories=())
         grant = LiveAuthorization(authorization_id="synthetic-qg6-explicit", binding=bundle.binding, total_limit=60,
             case_limits={row.execution_id: row.request_cap for row in plan.executions}, total_microusd=884760,
             case_microusd={row.execution_id: row.cost_cap_microusd for row in plan.executions},

@@ -9,6 +9,7 @@ from pydantic_ai.messages import ModelMessagesTypeAdapter, ModelRequest, ModelRe
 
 from myrk.conversation import Conversation, ConversationRecord, Task, TaskScope
 from myrk.provider import ProviderConfig, configured_model
+from tests.support.observed_http import observed_mock_transport
 
 
 SUMMARY = "Goal: verify 937 against originals. Constraints: read only, never invent evidence. Failed: source not found. Pending: verify original sources."
@@ -82,7 +83,7 @@ def test_each_protocol_compacts_and_reopens_without_losing_originals_or_tool_par
         config = ProviderConfig(name="Controlled", protocol=protocol, base_url=base_url, model=model_name,
                                 context_window_override=15000, output_token_reserve=1024, context_safety_margin=512)
         task = Task(goal="Verify evidence with the original read-only constraints.", scope=None, provider_config=config)
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with configured_model("synthetic-only", config, http_client=http) as model:
                 conversation = Conversation.open(path)
                 turn = await conversation.ask("Latest correction: read only.", document=None, task=task, model=model)
@@ -143,7 +144,7 @@ def test_protocol_second_compaction_inherits_earlier_sources_when_input_usage_is
         config = ProviderConfig(name="Controlled", protocol=protocol, base_url=base_url, model=model_name,
                                 context_window_override=15000, output_token_reserve=1024, context_safety_margin=512)
         task = Task(goal="Keep the original constraints and verify the sources.", scope=None, provider_config=config)
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with configured_model("synthetic-only", config, http_client=http) as model:
                 first = await Conversation.open(path).ask("Latest correction: read only.", document=None, task=task, model=model)
                 assert first.status == "completed", first.error
@@ -201,7 +202,7 @@ def test_protocol_overflow_recovers_once_in_the_original_work_step(
         config = ProviderConfig(name="Controlled", protocol=protocol, base_url=base_url, model=model_name,
                                 context_window_override=40000, output_token_reserve=1024, context_safety_margin=512)
         task = Task(goal="Verify evidence without repeating actions.", scope=None, max_turns=1, provider_config=config)
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with configured_model("synthetic-only", config, http_client=http) as model:
                 turn = await Conversation.open(path).ask("Continue the original work.", document=None, task=task, model=model)
         assert turn.status == "completed", turn.error
@@ -262,7 +263,7 @@ def test_compacted_extension_description_can_be_retrieved_and_used_through_the_o
         config = ProviderConfig(context_window_override=40000, output_token_reserve=1024, context_safety_margin=512)
         scope = TaskScope(root=str(folder), allowed_actions=["read", "calculate"], provider="deepseek", recipients=["deepseek"])
         task = Task(goal="Research the inputs, then calculate the authorized table without modifying it.", scope=scope, provider_config=config)
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond)) as http:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond)) as http:
             async with configured_model("synthetic-only", config, http_client=http) as model:
                 first = await Conversation(path).ask("Obtain the table tool definition for later.", document=None, task=task, scope=scope, model=model)
                 assert first.status == "completed", first.error

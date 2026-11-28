@@ -13,7 +13,10 @@ from pydantic_ai.models.openai import OpenAIChatModel, OpenAIChatModelSettings
 from pydantic_ai.providers.deepseek import DeepSeekProvider
 from pydantic_ai.tools import ToolDefinition
 
+from myrk.conversation import Conversation, ConversationRecord, Task
 from myrk.provider import ProviderConfig, configured_model, deepseek_model
+from tests.support.observed_http import observed_mock_transport
+from tests.test_compaction_protocols import SUMMARY, historical_messages, wire_response
 
 
 @pytest.fixture(autouse=True)
@@ -82,19 +85,21 @@ def test_deepseek_factories_send_the_supported_output_limit(factory, limit, stre
     assert payload["tools"][0]["function"]["parameters"] == schema
 
 
-def test_openai_compatible_provider_keeps_its_output_limit_field():
+@pytest.mark.parametrize("protocol,base_url,model_name,limit_field", [
+    ("deepseek", "https://api.deepseek.com/v1", "deepseek-flash", "max_tokens"),
+    ("openai-chat", "https://example.test/v1", "deepseek-flash", "max_completion_tokens"),
+    ("openai-chat", "https://example.test/v1", "gpt-4o", "max_completion_tokens"),
+])
+def test_custom_endpoint_uses_its_protocol_output_limit_field(protocol, base_url, model_name, limit_field):
     requests = []
 
     def respond(request):
         requests.append(json.loads(request.content))
-        assert str(request.url) == "https://example.test/v1/chat/completions"
-        return httpx2.Response(200, json={"id": "offline-openai-limit", "object": "chat.completion", "created": 1,
-            "model": "gpt-4o", "choices": [{"index": 0,
-                "message": {"role": "assistant", "content": "Offline response."}, "finish_reason": "stop"}]})
+        assert str(request.url) == f"{base_url}/chat/completions"
+        return wire_response(request, protocol, model_name, "Offline response.")
 
     async def run():
-        config = ProviderConfig(name="Compatible fixture", protocol="openai-chat",
-            base_url="https://example.test/v1", model="gpt-4o")
+        config = ProviderConfig(name="Custom endpoint", protocol=protocol, base_url=base_url, model=model_name)
         async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond), trust_env=False) as http:
             async with configured_model("synthetic-only", config, http_client=http) as model:
                 await model.request([ModelRequest(parts=[UserPromptPart("Inspect the local output limit.")])],
@@ -102,22 +107,57 @@ def test_openai_compatible_provider_keeps_its_output_limit_field():
 
     asyncio.run(run())
     assert len(requests) == 1
-    assert requests[0]["max_completion_tokens"] == 32
-    assert "max_tokens" not in requests[0]
+    assert requests[0]["model"] == model_name
+    limits = {key: requests[0][key] for key in ("max_tokens", "max_completion_tokens") if key in requests[0]}
+    assert limits == {limit_field: 32}
+
+
+def test_deepseek_compaction_sends_the_output_reserve_as_max_tokens(tmp_path):
+    config = ProviderConfig(context_window_override=15000, output_token_reserve=1024, context_safety_margin=512)
+    task = Task(goal="Verify originals", scope=None, provider_config=config)
+    path = tmp_path / "conversation.json"
+    record = ConversationRecord(version=9, messages=historical_messages(config.protocol), turns=[])
+    path.write_text(record.model_dump_json(), encoding="utf-8")
+    requests = []
+
+    def respond(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        text = "Continue verified work." if body.get("stream") else SUMMARY
+        return wire_response(request, config.protocol, config.model, text)
+
+    async def run():
+        transport = observed_mock_transport(respond)
+        async with httpx2.AsyncClient(transport=transport, trust_env=False) as http:
+            async with configured_model("synthetic-only", config, http_client=http) as model:
+                return await Conversation.open(path).ask("Latest correction: read only.", document=None, task=task, model=model)
+
+    turn = asyncio.run(run())
+    assert turn.status == "completed", turn.error
+    assert [attempt.purpose for attempt in turn.request_attempts] == ["compaction", "work"]
+    assert len(requests) == turn.requests == 2
+    summary, work = requests
+    assert not summary.get("stream")
+    assert summary["max_tokens"] == 1024
+    assert "max_completion_tokens" not in summary
+    assert not summary.get("tools")
+    assert work["stream"]
+    assert SUMMARY in json.dumps(work, ensure_ascii=False)
 
 
 @pytest.mark.parametrize("factory", ["configured", "legacy"])
-def test_deepseek_output_compatibility_keeps_the_remaining_sdk_profile(factory):
+def test_deepseek_factories_use_the_native_sdk_profile(factory):
     def never_send(_request):
         pytest.fail("Inspecting a model profile should not dispatch a request")
 
     async def run():
         async with httpx2.AsyncClient(transport=httpx2.MockTransport(never_send), trust_env=False) as http:
             async with DeepSeekProvider(api_key="synthetic-only", http_client=http) as provider:
-                original = OpenAIChatModel("deepseek-flash", provider=provider).profile
+                native_profile = OpenAIChatModel("deepseek-flash", provider=provider).profile
+                assert native_profile.get("openai_chat_supports_max_completion_tokens") is False
                 connection = (configured_model("synthetic-only", ProviderConfig(), http_client=http)
                     if factory == "configured" else deepseek_model("synthetic-only", http_client=http))
                 async with connection as model:
-                    assert model.profile == {**original, "openai_chat_supports_max_completion_tokens": False}
+                    assert model.profile == native_profile
 
     asyncio.run(run())

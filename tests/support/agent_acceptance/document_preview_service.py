@@ -12,6 +12,7 @@ import httpx2
 from pydantic_ai import models
 from pydantic_ai.models import Model
 from myrk.desktop_service import serve
+from myrk.observed_http import ObservedHTTPTransport
 from myrk.provider import deepseek_model
 from tests.support.agent_acceptance.delegation import returned_object
 from tests.support.agent_acceptance.replay import OfflineSession, Reply, SDKCapture
@@ -66,7 +67,7 @@ async def main() -> None:
     if receipt := os.environ.get('MYRK_PROCESS_RECEIPT_DIRECTORY'):
         from tests.support.process_receipt import write_process_receipt
         write_process_receipt(Path(receipt),__file__)
-    client=httpx2.AsyncClient(transport=httpx2.MockTransport(respond),trust_env=False)
+    client=httpx2.AsyncClient(transport=ObservedHTTPTransport(httpx2.MockTransport(respond)),trust_env=False)
     @asynccontextmanager
     async def factory(key: str) -> AsyncIterator[Model]:
         async with deepseek_model(key,http_client=client) as model:

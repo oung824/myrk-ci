@@ -3,7 +3,6 @@
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
-import os
 import asyncio
 import sys
 import stat
@@ -54,7 +53,6 @@ async def main() -> int:
             entries.extend({"path": {"type": "path", "path": Path(path).as_uri()}, "access": "write"} for path in command["extra_write_paths"])
             entries.extend(denied)
         environment = {"PYTHONIOENCODING": "utf-8", "PYTHONPATH": command["application_root"]}
-        environment.update({key: os.environ[key] for key in ("MYRK_PROCESS_OWNER_FILE", "MYRK_PROCESS_RECEIPT_DIRECTORY", "MYRK_TEST_NORMAL_EXIT_FLAG", "MYRK_EXIT_CASE_DIRECTORY") if key in os.environ})
         inputs = list(dict.fromkeys(candidate.absolute() for argument in command["argv"]
             if (candidate := cwd / argument).is_file() and candidate.resolve().is_relative_to(cwd)))
         async def observe(path: Path) -> dict[str, Any] | None:

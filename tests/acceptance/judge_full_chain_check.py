@@ -1,21 +1,21 @@
 """Explicit diagnostic for all 130 native judge exchanges in one parent."""
 
-import os
+from contextlib import ExitStack
 from pathlib import Path
 
+from tests.acceptance.judge_test_material import judge_test_material, register_judge_parent_cleanup
 from tests.acceptance.test_judge_qualification import candidate, samples
 from tests.support.agent_acceptance.judge_qualification import freeze_judge_study, qualification_report
 
 def test_native_judge_package_runs_full_30_then_100_with_one_parent(prepared_root, acceptance_public_root, request):
     import asyncio
     import json
-    from hashlib import sha256
-    from uuid import uuid4
     from tests.support.agent_acceptance import AcceptancePlan, CaseRegistry, FrozenParentBudget, LiveAuthorization, LiveGate, Reply, prepare_live, run_plan, export_review, review_report
     from tests.support.agent_acceptance.judge_qualification import judge_executions, register_judge_study
     source = Path(__file__).resolve().parents[2]
-    local = source / '.scratch/retro-agent-live-acceptance-20261116/implementation/review-fixes-01/check-tmp' / Path(os.environ['MYRK_CHECK_RUN_DIRECTORY']).name / uuid4().hex
-    local.mkdir(parents=True, exist_ok=False)
+    stack = ExitStack()
+    request.addfinalizer(stack.close)
+    local = stack.enter_context(judge_test_material(source))
     calibration = samples(local / 'calibration', 'cal', 6)
     qualification = samples(local / 'qualification', 'qual', 20)
     study = freeze_judge_study(local / 'study', calibration=calibration, qualification=qualification,
@@ -27,22 +27,14 @@ def test_native_judge_package_runs_full_30_then_100_with_one_parent(prepared_roo
     register_judge_study(registry, study, fixed_replies=fixed_replies)
     parent = FrozenParentBudget(parent_id='synthetic-judge-'+prepared_root.name, accounting_root=prepared_root,
         request_cap=130, phase_microusd={'screening':0,'quality':0,'judge':130*122880}, reserve_microusd=0, profile='synthetic')
-    index = Path('E:/Myrk/.scratch/acceptance-parent-budgets') / (sha256(parent.parent_id.encode()).hexdigest()+'.json')
-    def cleanup():
-        import shutil
-        if index.exists():
-            assert index.parent == Path('E:/Myrk/.scratch/acceptance-parent-budgets') and not index.is_symlink()
-            index.unlink()
-        assert local.resolve().is_relative_to((source / '.scratch/retro-agent-live-acceptance-20261116/implementation/review-fixes-01/check-tmp' / Path(os.environ['MYRK_CHECK_RUN_DIRECTORY']).name).resolve())
-        if local.exists():
-            shutil.rmtree(local)
-    request.addfinalizer(cleanup)
     plan = AcceptancePlan(executions=rows, parent_budget=parent)
     bundle = prepare_live(plan.model_copy(update={'mode':'prepare-live'}), root=prepared_root, registry=registry)
     grant = LiveAuthorization(authorization_id='synthetic-judge-only', binding=bundle.binding, total_limit=130,
         case_limits={row.execution_id:1 for row in rows}, total_microusd=parent.total_microusd,
         case_microusd={row.execution_id:122880 for row in rows}, transport='mock', parent_budget_id=parent.parent_id)
     gate = LiveGate(prepared_root, registry, grant)
+    register_judge_parent_cleanup(request, gate.parent_binding_path(parent.parent_id),
+                                  parent_id=parent.parent_id, accounting_root=prepared_root)
     result = asyncio.run(run_plan(plan, root=acceptance_public_root, registry=registry, live_gate=gate))
     report = qualification_report(study, result_path=result.result_path)
     assert report['fixture_status'] == 'qualified'

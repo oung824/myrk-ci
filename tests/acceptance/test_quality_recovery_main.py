@@ -35,7 +35,7 @@ def test_qg5_supplement_main_uses_actual_user_event_and_one_exact_edit(prepared_
         identity = "quality:deepseek:QG5.formal.1:1"
         execution = next(row for row in proposal.executions if row.execution_id == identity).model_copy(update={"order": 1})
         plan = AcceptancePlan(executions=(execution,), parent_budget=parent, quality_packet=reference, mode="offline")
-        bundle = prepare_live(plan.model_copy(update={"mode": "prepare-live"}), root=prepared_root, registry=registry)
+        bundle = prepare_live(plan.model_copy(update={"mode": "prepare-live"}), root=prepared_root, registry=registry, evaluator_isolation_directories=())
         grant = LiveAuthorization(authorization_id="synthetic-qg5-explicit", binding=bundle.binding, total_limit=24,
             case_limits={row.execution_id: row.request_cap for row in plan.executions}, total_microusd=353904,
             case_microusd={row.execution_id: row.cost_cap_microusd for row in plan.executions},
@@ -115,7 +115,7 @@ def _run_main_control(task_id, prepared_root, acceptance_public_root, *, build_p
         identity = "quality:deepseek:" + task_id + ":1"
         execution = next(row for row in proposal.executions if row.execution_id == identity).model_copy(update={"order": 1})
         plan = AcceptancePlan(executions=(execution,), parent_budget=parent, quality_packet=reference, mode="offline")
-        bundle = prepare_live(plan.model_copy(update={"mode": "prepare-live"}), root=prepared_root, registry=registry)
+        bundle = prepare_live(plan.model_copy(update={"mode": "prepare-live"}), root=prepared_root, registry=registry, evaluator_isolation_directories=())
         grant = LiveAuthorization(authorization_id="synthetic-qg5-explicit", binding=bundle.binding, total_limit=24,
             case_limits={row.execution_id: row.request_cap for row in plan.executions}, total_microusd=353904,
             case_microusd={row.execution_id: row.cost_cap_microusd for row in plan.executions},

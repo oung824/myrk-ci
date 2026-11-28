@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
@@ -10,6 +11,23 @@ import { projectRoot } from './project-paths.mjs'
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const project = projectRoot(dirname(desktop))
 const npm = process.env.npm_execpath ?? join(dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js')
+const fixtureEnvironment = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.toUpperCase().startsWith('GIT_')))
+
+function gitFixtureEnvironment(source) {
+  return { ...fixtureEnvironment, GIT_CONFIG_GLOBAL: join(source, '.git', 'fixture-global-config'), GIT_CONFIG_NOSYSTEM: '1' }
+}
+
+function initializeGitFixture(source, message) {
+  const env = gitFixtureEnvironment(source)
+  const git = (...arguments_) => {
+    const result = spawnSync('git', arguments_, { cwd: source, env, encoding: 'utf8', timeout: 30000, windowsHide: true })
+    assert.equal(result.status, 0, result.stderr || result.error?.message)
+    return result.stdout.trim()
+  }
+  git('init', '-q', '--template=', '--initial-branch=scheduling-contract')
+  git('-c', 'user.name=Scheduling Contract', '-c', 'user.email=scheduling-contract@example.invalid', 'commit', '--allow-empty', '-qm', message)
+  return git('rev-parse', 'HEAD')
+}
 
 async function fixture() {
   const parent = process.env.MYRK_TEST_RUN_DIRECTORY ?? join(project, '.scratch/check-runs/runtime-tmp')
@@ -19,7 +37,7 @@ async function fixture() {
   for (const folder of ['tests', 'src/main', 'src/preload', 'src/renderer']) await mkdir(join(source, 'desktop', folder), { recursive: true })
   await writeFile(join(source, 'owner.json'), JSON.stringify({ project_root: project, source_root: dirname(desktop), runtime_directory: source, purpose: 'desktop-scheduling-contract', pid: process.pid, created_at: new Date().toISOString(), process_started_at: new Date(Date.now() - process.uptime() * 1000).toISOString() }))
   for (const name of ['package.json', 'package-lock.json', 'vitest.config.ts']) await writeFile(join(source, 'desktop', name), await readFile(join(desktop, name)))
-  for (const name of ['run-tests.mjs', 'run-context.mjs', 'project-paths.mjs', 'dom-dialog.ts', 'test-timings.mjs', 'test-sequencer.mjs', 'test-reporter.mjs']) {
+  for (const name of ['run-tests.mjs', 'run-context.mjs', 'project-paths.mjs', 'dom-dialog.ts', 'test-timings.mjs', 'test-sequencer.mjs', 'test-reporter.mjs', 'test-receipts.mjs']) {
     if (existsSync(join(desktop, 'tests', name))) await writeFile(join(source, 'desktop/tests', name), await readFile(join(desktop, 'tests', name)))
   }
   await writeFile(join(source, 'desktop/tests/smoke.test.mjs'), "import test from 'node:test'; test('fixture contract', () => {})\n")
@@ -34,7 +52,7 @@ async function fixture() {
 }
 
 async function run(source, mode, filters = ['src/main/ordinary.test.ts'], extra = {}) {
-  const env = { ...process.env, MYRK_TEST_SCHEDULING: mode, npm_config_cache: join(source, '.scratch/npm-cache'), ...extra }
+  const env = { ...gitFixtureEnvironment(source), MYRK_TEST_SCHEDULING: mode, MYRK_TEST_SCHEDULING_FIXTURE: source, npm_config_cache: join(source, '.scratch/npm-cache'), ...extra }
   delete env.NODE_TEST_CONTEXT
   for (const key of ['MYRK_TEST_RUN_DIRECTORY', 'MYRK_TEST_RUN_PARENT', 'MYRK_TEST_TIMING_REFERENCE', 'MYRK_DOCUMENT_EVIDENCE_DIRECTORY', 'MYRK_IMAGE_EVIDENCE_DIRECTORY', 'MYRK_WORKFLOW_EVIDENCE_DIRECTORY']) if (!(key in extra)) delete env[key]
   const result = spawnSync(process.execPath, [npm, 'test', '--', ...filters], { cwd: join(source, 'desktop'), env, encoding: 'utf8', timeout: 90000, windowsHide: true })
@@ -84,12 +102,59 @@ test('npm test schedules every discovered file once and automatically runs new s
   } finally { await rm(source, { recursive: true, force: true }) }
 })
 
+test('npm test records the source checkout when Git environment variables point to another repository', async () => {
+  const source = await fixture()
+  try {
+    const foreign = join(source, 'foreign')
+    await mkdir(foreign)
+    const commit = initializeGitFixture(source, 'Scheduling source')
+    const foreignCommit = initializeGitFixture(foreign, 'Unrelated source')
+    assert.notEqual(foreignCommit, commit)
+    const result = await run(source, 'duration', [], {
+      GIT_DIR: join(foreign, '.git'),
+      GIT_COMMON_DIR: join(foreign, '.git'),
+      GIT_WORK_TREE: source,
+      GIT_INDEX_FILE: join(foreign, '.git/index'),
+    })
+    assert.equal(result.status, 0, result.output)
+    assert.equal(result.receipt.scheduling.source_lookup.status, 'verified')
+    assert.equal(result.receipt.scheduling.source_commit, commit)
+  } finally { await rm(source, { recursive: true, force: true }) }
+})
+
+test('npm test preserves verified timings when the source Git ref points to a missing object', async () => {
+  const source = await fixture()
+  try {
+    const commit = initializeGitFixture(source, 'Scheduling source')
+    const first = await run(source, 'duration', [])
+    assert.equal(first.status, 0, first.output)
+    assert.equal(first.receipt.scheduling.source_commit, commit)
+    assert.equal(first.receipt.scheduling.timing_index_updated, true)
+    const indexPath = first.receipt.scheduling.index.path
+    const verifiedIndex = await readFile(indexPath, 'utf8')
+    assert.equal(JSON.parse(verifiedIndex).source_commit, commit)
+
+    await writeFile(join(source, '.git/refs/heads/scheduling-contract'), `${'f'.repeat(commit.length)}\n`)
+    const next = await run(source, 'duration', [])
+    assert.equal(next.status, 0, next.output)
+    assert.equal(next.receipt.scheduling.reason, 'passed')
+    assert.equal(await readFile(indexPath, 'utf8'), verifiedIndex, 'Unverified source must preserve the verified index')
+    assert.equal(first.receipt.scheduling.source_lookup.status, 'verified')
+    assert.equal(next.receipt.scheduling.source_commit, null)
+    assert.equal(next.receipt.scheduling.source_lookup.status, 'failed')
+    assert.equal(next.receipt.scheduling.timing_index_updated, false)
+    assert.equal(next.receipt.scheduling.planned[0].origin, 'timing-index')
+  } finally { await rm(source, { recursive: true, force: true }) }
+})
+
 test('npm test defaults to duration, learns new files, and supports explicit legacy fallback', async () => {
   const source = await fixture()
   try {
     const first = await run(source, undefined, [])
     assert.equal(first.status, 0, first.output)
     assert.equal(first.receipt.scheduling.mode, 'duration')
+    assert.equal(first.receipt.scheduling.source_lookup.status, 'fixture')
+    assert.equal(first.receipt.scheduling.source_commit, null)
     assert.equal(first.receipt.scheduling.timing_index_updated, true, JSON.stringify(first.receipt.scheduling))
     const indexPath = first.receipt.scheduling.index.path
     const firstIndex = JSON.parse(await readFile(indexPath, 'utf8'))
@@ -192,5 +257,13 @@ test('npm test reports cancellation and keeps the last complete successful index
     assert.equal(cancelled.receipt.scheduling.timing_index_updated, false)
     assert.equal(await readFile(index, 'utf8'), baseline)
     assert.equal(cancelled.status, 1, cancelled.output)
+    const launch = JSON.parse(await readFile(join(source, '.scratch', 'check-runs', 'launches', cancelled.receipt.invocation_id + '.json'), 'utf8'))
+    assert.equal(launch.terminal.status, 'interrupted')
+    assert.ok(cancelled.receipt.failure_logs.length)
+    const originals = Object.keys(launch.terminal.required_artifacts).sort()
+    assert.deepEqual(originals, [...cancelled.receipt.failure_logs].sort())
+    for (const path of originals) {
+      assert.equal(launch.terminal.required_artifacts[path], createHash('sha256').update(await readFile(path)).digest('hex'))
+    }
   } finally { await rm(source, { recursive: true, force: true }) }
 })

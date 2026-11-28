@@ -7,6 +7,8 @@ from uuid import uuid4
 
 import pytest
 
+from myrk.project_paths import project_root
+from tests.support.agent_acceptance import quality_runtime
 from tests.support.agent_acceptance.frozen import SOURCE, source_material_path
 from tests.support.agent_acceptance.quality_files import exercise_files, score
 from tests.support.agent_acceptance.quality_materials import build_implementation_quality_packet
@@ -35,12 +37,19 @@ def synthetic_quality_packet():
     ],
 )
 def test_registered_answers_stay_private_and_decimal_check_runs(
-    acceptance_public_root, synthetic_quality_packet, task_id, sources, expected_total,
+    acceptance_public_root, synthetic_quality_packet, tmp_path, monkeypatch, task_id, sources, expected_total,
 ):
     original = source_material_path(synthetic_quality_packet.path).parent / "gold" / f"{task_id}.json"
     original_bytes = original.read_bytes()
     guard = json.loads(original_bytes)["private_review_guard"]
-    draft = SOURCE / ".scratch/material-candidates-20261123/qg2-drafts"
+    draft = tmp_path / "new-evaluator-drafts"
+    draft.mkdir()
+    directory = draft.relative_to(project_root(SOURCE)).as_posix()
+
+    def bind_with_evaluator_directory(*args, **kwargs):
+        return bind_packet(*args, **kwargs, evaluator_isolation_directories=(directory,))
+
+    monkeypatch.setattr(quality_runtime, "bind_packet", bind_with_evaluator_directory)
     registered_copy = draft / ("isolation-synthetic-" + uuid4().hex + ".json")
     with registered_copy.open("xb") as copy:
         copy.write(original_bytes)
@@ -62,7 +71,9 @@ def test_registered_answers_stay_private_and_decimal_check_runs(
     check = next(action for action in facts["actions"] if action["kind"] == "check")
     assert check["status"] == "completed" and check["exit_code"] == 0 and check["cleanup_complete"] is True
     assert observations["independent_check_sum_matches_gold"] is True
+    assert observations["independent_check_sum"] == expected_total
     assert observations["check_passed"] is True
+    assert observations["gold_not_in_sdk"] is True
     checker_read = next(action for action in facts["actions"] if action["kind"] == "read"
         and action["prepared_parameters"].get("path") == str(checker))
     assert checker_read["status"] == "completed"
@@ -78,9 +89,11 @@ def test_manifest_rejects_removed_evaluator_copy_denial(tmp_path, synthetic_qual
     checkout = tmp_path / "clone"
     root = tmp_path / "runtime"
     evidence_root = tmp_path / "evaluator-copy"
-    registered_root = checkout / ".scratch/material-candidates-20261123"
-    registered_root.mkdir(parents=True)
-    bind_packet(synthetic_quality_packet, "QG2.formal.3", root, source_roots=(checkout,), evidence_root=evidence_root)
+    registered_root = tmp_path / "new-evaluator-drafts"
+    registered_root.mkdir()
+    directory = registered_root.relative_to(project_root(SOURCE)).as_posix()
+    bind_packet(synthetic_quality_packet, "QG2.formal.3", root, source_roots=(checkout,),
+        evidence_root=evidence_root, evaluator_isolation_directories=(directory,))
     case_id = "quality.qg2.formal.3"
     settings = manifest(case_id, root, "deepseek")["approval"]["access"]
     path = root / "quality-task.json"

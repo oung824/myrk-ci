@@ -9,6 +9,7 @@ from typing import Any
 
 from tests.support.agent_acceptance.frozen import SOURCE
 from tests.support.agent_acceptance.quality import freeze_quality, quality_model_settings, TEMPLATES
+from tests.support.agent_acceptance.quality_legacy_fixtures import convert_implementation_template
 from tests.support.agent_acceptance.quality_packet import PACKETS, QualityPacketRef
 from tests.support.agent_acceptance.reporting import environment_facts
 
@@ -36,6 +37,7 @@ def build_implementation_quality_packet(destination: Path) -> QualityPacketRef:
         key = f"{group}.{purpose}.{slot}"
         instance = instances.get(key)
         original: dict[str, Any] | None = None
+        fixture: tuple[Path, bytes] | None = None
         if group == "QG4":
             ordinal = (1, 2, 4, 6, 5, 8, 7, 3, 10, 9)[slot - 1] if purpose == "formal" else slot
             original = next(row for row in memories if row["ordinal"] == ordinal and (row["role"] == "formal_holdout") == (purpose == "formal"))
@@ -49,7 +51,10 @@ def build_implementation_quality_packet(destination: Path) -> QualityPacketRef:
         elif group == "QG5":
             if purpose == "formal" and str(slot) in recoveries:
                 original = recoveries[str(slot)]
-                body = (recovery_root / original["material"]).read_text(encoding="utf-8")
+                fixture_source = recovery_root / original["material"]
+                fixture_bytes = fixture_source.read_bytes()
+                fixture = (fixture_source, fixture_bytes)
+                body = fixture_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
                 instance = {"goal": original["input"], "sources": {"source.txt": {"text": body}},
                     "parameters": {"source_id": original["material_family_id"], "original_input": original["input"]},
                     "gold": {"facts": original["gold"]}, "family": original["material_family_id"]}
@@ -62,7 +67,10 @@ def build_implementation_quality_packet(destination: Path) -> QualityPacketRef:
                     "gold": json.loads((queue_root / original["gold"]).read_bytes()), "family": original["family_id"]}
         elif group == "QG6":
             original = next(row for row in continuity if row["slot"] == slot and row["purpose"] == purpose)
-            incoming = json.loads((SOURCE / original["input_path"]).read_bytes())
+            fixture_source = SOURCE / original["input_path"]
+            fixture_bytes = fixture_source.read_bytes()
+            fixture = (fixture_source, fixture_bytes)
+            incoming = json.loads(fixture_bytes)
             documents = incoming["source_documents"]
             sources = {}
             count = len(documents) if len(documents) >= 16 else 16
@@ -106,6 +114,9 @@ def build_implementation_quality_packet(destination: Path) -> QualityPacketRef:
             "sources": instance["sources"], "parameters": instance.get("parameters", {})}
         from tests.support.agent_acceptance.quality_runtime import QualityVisibleInput, output_standards, required_outputs, handler
         provisional = QualityVisibleInput.model_validate(visible)
+        if fixture is not None:
+            fixture_source, fixture_bytes = fixture
+            provisional = convert_implementation_template(provisional, fixture_source, fixture_bytes, task["material_family_id"])
         owner = handler(provisional)
         if group == "QG5" and visible["adapter"] in {"qg5-1", "qg5-7", "qg5-tuning-1"} and owner is not None and owner.supports(provisional):
             workflow = owner.workflow(provisional)
@@ -113,10 +124,16 @@ def build_implementation_quality_packet(destination: Path) -> QualityPacketRef:
             visible["sources"] = {"current-source.txt": {"text": owner.content(provisional)}}
             visible["goal"] = owner.current_goal(provisional)
             task["objective"] = visible["goal"]
+            provisional = QualityVisibleInput.model_validate(visible)
         if group in {"QG5", "QG6"} and owner is not None and hasattr(owner, "project_input"):
-            projected = owner.project_input(QualityVisibleInput.model_validate(visible))
+            projected = owner.project_input(provisional)
             visible = projected.model_dump(mode="json")
             task["objective"] = visible["goal"]
+        selected = QualityVisibleInput.model_validate(visible)
+        if selected.adapter == "qg6-9":
+            from tests.support.agent_acceptance.quality_compaction_correction import validate_input
+
+            validate_input(selected)
         paths = {kind: destination / kind / (identity + ".json") for kind in ("input", "gold")}
         for kind, path in paths.items():
             path.parent.mkdir(exist_ok=True)
@@ -124,10 +141,9 @@ def build_implementation_quality_packet(destination: Path) -> QualityPacketRef:
                 "private_review_guard": "review-only-" + sha256(json.dumps(visible, ensure_ascii=False, sort_keys=True).encode()).hexdigest(),
                 "owner_source": original, "prior_uses": ["implementation"], "current_quality_eligibility": "implementation_regression_only"}
             if kind == "gold" and owner is not None and hasattr(owner, "review_additions"):
-                value["implementation_extensions"] = owner.review_additions(QualityVisibleInput.model_validate(visible))
+                value["implementation_extensions"] = owner.review_additions(selected)
             path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             task[kind + "_path"] = path
-        selected = QualityVisibleInput.model_validate(visible)
         declaration = output_standards(selected)
         if declaration is not None:
             task["domain_standards"] = declaration

@@ -16,6 +16,7 @@ from myrk.conversation import Conversation
 from myrk.provider import ProviderConfig, configured_model
 from myrk.request_observation import observe_request
 from myrk.task_control import RequestAttempt
+from tests.support.observed_http import observed_mock_transport
 
 
 @pytest.fixture(autouse=True)
@@ -61,7 +62,7 @@ def test_json_response_preserves_native_finish_and_reasoning():
             "content-type": "application/json", "content-encoding": "gzip"})
 
     async def run():
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond), trust_env=False) as client:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond), trust_env=False) as client:
             async with configured_model("synthetic-observation-only", ProviderConfig(), http_client=client) as model:
                 attempt = RequestAttempt(number=1, model=model.model_name, provider="deepseek", purpose="compaction")
                 observed = observe_request(model, attempt)
@@ -87,7 +88,7 @@ def exchange_reply():
             return response
 
         async def run():
-            async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond), trust_env=False) as client:
+            async with httpx2.AsyncClient(transport=observed_mock_transport(respond), trust_env=False) as client:
                 async with configured_model("synthetic-observation-only", config or ProviderConfig(), http_client=client) as model:
                     attempt = RequestAttempt(number=1, model=model.model_name, provider=model.system)
                     observed = observe_request(model, attempt)
@@ -213,7 +214,7 @@ def test_interrupted_sse_persists_reported_reasoning_without_inventing_a_finish(
 
     async def run():
         path = tmp_path / "interrupted-observation.json"
-        async with httpx2.AsyncClient(transport=httpx2.MockTransport(respond), trust_env=False) as client:
+        async with httpx2.AsyncClient(transport=observed_mock_transport(respond), trust_env=False) as client:
             async with configured_model("synthetic-observation-only", ProviderConfig(), http_client=client) as model:
                 turn = await Conversation(path).ask("Answer locally.", document=None, model=model,
                     on_update=lambda update: delivered.append(update.text) if update.kind == "text" else None)

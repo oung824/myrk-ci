@@ -17,12 +17,33 @@ from myrk.task_control import TaskBudget
 
 
 @pytest.mark.parametrize("kind", ["command", "send", "check"])
-def test_execution_reports_its_actual_kind_and_preserves_receipts_and_streams(tmp_path: Path, kind: str) -> None:
+def test_execution_reports_its_actual_kind_and_preserves_receipts_and_streams(
+    tmp_path: Path, kind: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application_variables = (
+        "MYRK_PROCESS_OWNER_FILE",
+        "MYRK_PROCESS_RECEIPT_DIRECTORY",
+        "MYRK_TEST_NORMAL_EXIT_FLAG",
+        "MYRK_EXIT_CASE_DIRECTORY",
+        "MYRK_CHECK_ENVIRONMENT_TEST_SENTINEL",
+    )
+    for name in application_variables:
+        monkeypatch.setenv(name, "synthetic-application-value")
+    script = """
+import json, os, sys
+from pathlib import Path
+
+environment = {name: os.environ[name] for name in sys.argv[1:] if name in os.environ}
+Path('environment.json').write_text(json.dumps(environment), encoding='utf-8')
+print('actual-output')
+print('actual-error', file=sys.stderr)
+"""
     actions: list[Action] = []
     executor = ActionExecutor(actions=actions, budget=TaskBudget(Task(goal="运行普通命令", scope=None, request_limit=10)), save=lambda: None, notify=lambda action: None)
 
     async def command(action: Action) -> str:
-        return await execute_check([sys.executable, "-c", "import sys;print('actual-output');print('actual-error',file=sys.stderr)"], tmp_path, 5, action,
+        argv = [sys.executable, "-c", script, "PYTHONIOENCODING", "PYTHONPATH", *application_variables]
+        return await execute_check(argv, tmp_path, 5, action,
                                    access=AccessSettings(writable_roots=[str(tmp_path)]), save=lambda: None,
                                    evidence_directory=tmp_path / "records" / "checks", protected_paths=[])
 
@@ -38,6 +59,8 @@ def test_execution_reports_its_actual_kind_and_preserves_receipts_and_streams(tm
     assert receipt.action_id == action.id and receipt.exit_code == 0 and receipt.sandbox_type == "windowsMxc"
     assert Path(action.stdout_path).read_text(encoding="utf-8") == "actual-output\n"
     assert Path(action.stderr_path).read_text(encoding="utf-8") == "actual-error\n"
+    environment = json.loads((tmp_path / "environment.json").read_text(encoding="utf-8"))
+    assert environment == {"PYTHONIOENCODING": "utf-8", "PYTHONPATH": str(Path(__file__).resolve().parents[1])}
 
 
 @pytest.mark.parametrize("kind", ["command", "send", "check"])

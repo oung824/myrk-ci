@@ -53,16 +53,17 @@ def register_quality_packet(registry: "CaseRegistry", reference: QualityPacketRe
     value = read_quality_packet(reference)
     capabilities = {"QG1": "ordinary", "QG2": "file-effects", "QG3": "independent-review",
         "QG4": "project-memory", "QG5": "recovery", "QG6": "compaction-semantics"}
-    from tests.support.agent_acceptance.quality_runtime import supported_input, QualityVisibleInput, output_standards, required_outputs, handler
+    from tests.support.agent_acceptance.quality_runtime import load_frozen_input, output_standards, required_outputs, handler
     from tests.support.agent_acceptance.quality import verify_task_output_standards
     desktop_sources = bindings()
     packet_sources = (source_material_path(reference.path), *(source_material_path(Path(name)) for name in value.files))
     for task in value.tasks:
         product_stop_scope = "task" if task.group == "QG5" else "execution"
+        formal_live = False
         actual_standards: dict[str, dict[str, Any]] = {kind: standard.model_dump(mode="json") for kind, standard in task.domain_standards.items()}
-        raw = source_material_path(task.input_path).read_text(encoding="utf-8").lstrip()
-        if raw.startswith("{"):
-            visible = QualityVisibleInput.model_validate_json(raw)
+        raw = source_material_path(task.input_path).read_bytes()
+        if raw.lstrip().startswith(b"{"):
+            visible = load_frozen_input(raw, reference)
             expected_adapter = task.group.lower() + ("-" + str(task.slot) if task.purpose == "formal" else "-tuning-" + str(task.slot))
             if visible.task_id != task.task_id or visible.goal != task.objective or visible.adapter != expected_adapter:
                 raise ValueError("Canonical quality task goal, template adapter or identity differs from its frozen source.")
@@ -78,10 +79,11 @@ def register_quality_packet(registry: "CaseRegistry", reference: QualityPacketRe
             if declared is not None:
                 verify_task_output_standards(task, declared)
                 actual_standards = declared
+            formal_live = module is not None and module.supports(visible) is True
         registry.register(AcceptanceCase("quality." + task.task_id.lower(), capabilities[task.group],
             ("deepseek", "openai-chat", "google"), handoff,
             bindings=(*desktop_sources, *packet_sources),
-            prepare=prepare, formal_live=supported_input(source_material_path(task.input_path)), frozen_material_input=True, owner_ticket="24",
+            prepare=prepare, formal_live=formal_live, frozen_material_input=True, owner_ticket="24",
             product_stop_scope="task" if product_stop_scope == "task" else "execution",
             output_standards=actual_standards,
             applicability="Canonical task-specific packet; current implementation materials are regression, not unseen quality evidence."))

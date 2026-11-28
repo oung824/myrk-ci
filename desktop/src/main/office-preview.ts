@@ -3,6 +3,9 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { extname, isAbsolute, join, relative } from 'node:path'
 import workerScript from '../../scripts/office-preview-worker.ps1?raw'
 
+export const OFFICE_PREVIEW_CONVERSION_TIMEOUT_MS = 90_000
+export const OFFICE_PREVIEW_CLEANUP_TIMEOUT_MS = 15_000
+
 export type OfficePreview = {
   engine: 'microsoft-office'
   sourceSha256: string
@@ -52,7 +55,8 @@ export async function openOfficePreview(options: { sourcePath: string; directory
       options.signal?.addEventListener('abort', abort, { once: true })
       if (options.signal?.aborted) abort()
     }
-    const timeout = setTimeout(() => { timedOut = true; child.kill() }, mode === 'convert' ? 90000 : 15000)
+    const timeoutMs = mode === 'convert' ? OFFICE_PREVIEW_CONVERSION_TIMEOUT_MS : OFFICE_PREVIEW_CLEANUP_TIMEOUT_MS
+    const timeout = setTimeout(() => { timedOut = true; child.kill() }, timeoutMs)
     child.once('error', error => rejectRun(mode === 'cleanup' ? new OfficePreviewCleanupError(options.directory, String(error)) : error))
     child.once('close', code => {
       clearTimeout(timeout)

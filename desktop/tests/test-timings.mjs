@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
-import { execFileSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { lstat, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 
 export const timingLimit = 2 * 1024 * 1024
@@ -56,18 +56,36 @@ export async function prepareScheduling(run, mode, arguments_) {
   const { parseCLI } = await import('vitest/node')
   const parsed = parseCLI(['vitest', 'run', ...arguments_])
   const fullCollectionRequested = parsed.filter.length === 0 && !parsed.options['--']?.length && Object.keys(parsed.options).every(name => ['--', 'run', 'reporter', 'outputFile', 'color', 'clearScreen', 'logHeapUsage', 'maxWorkers', 'fileParallelism', 'disableConsoleIntercept'].includes(name))
+  const isFixture = run.environment.MYRK_TEST_SCHEDULING_FIXTURE === run.source && run.source === run.project
+    && (await readdir(join(run.source, '.git')).catch(() => null))?.length === 0
   let sourceCommit = null
-  try {
-    const [root, commit] = execFileSync('git', ['rev-parse', '--show-toplevel', 'HEAD'], { cwd: run.source, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }).trim().split(/\r?\n/)
-    if (resolve(root) === resolve(run.source)) sourceCommit = commit
-  } catch {}
-  const scheduling = { mode, environment, index: { path: indexPath, status: index.status }, reference, full_collection_requested: fullCollectionRequested, source_commit: sourceCommit, timing_index_updated: false }
+  let sourceLookup = { status: 'fixture' }
+  if (!isFixture) {
+    const configFileVariables = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_SYSTEM', 'GIT_CONFIG_NOSYSTEM']
+    const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => {
+      const key = name.toUpperCase()
+      return !key.startsWith('GIT_') || configFileVariables.includes(key)
+    }))
+    const git = spawnSync('git', ['rev-parse', '--show-toplevel', '--verify', 'HEAD^{commit}'], {
+      cwd: run.source, env, encoding: 'utf8', timeout: 30000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    if (git.error || git.status !== 0) {
+      sourceLookup = { status: 'failed', reason: 'git-command-failed', exit_code: git.status, ...(git.error ? { error_code: git.error.code } : {}) }
+    } else {
+      const [root, commit] = git.stdout.trim().split(/\r?\n/)
+      if (resolve(root) === run.source) {
+        sourceCommit = commit
+        sourceLookup = { status: 'verified' }
+      } else sourceLookup = { status: 'failed', reason: 'source-root-mismatch' }
+    }
+  }
+  const scheduling = { mode, environment, index: { path: indexPath, status: index.status }, reference, full_collection_requested: fullCollectionRequested, source_commit: sourceCommit, source_lookup: sourceLookup, timing_index_updated: false }
   await writeFile(join(run.directory, 'scheduling-input.json'), JSON.stringify({ ...scheduling, entries }))
   return scheduling
 }
 
 export async function updateTimingIndex(run, scheduling) {
-  if (!scheduling.full_collection_requested || scheduling.reason !== 'passed' || scheduling.unhandled_errors !== 0 || !scheduling.discovered.length) return
+  if (scheduling.source_lookup.status === 'failed' || !scheduling.full_collection_requested || scheduling.reason !== 'passed' || scheduling.unhandled_errors !== 0 || !scheduling.discovered.length) return
   const expected = scheduling.discovered.map(timingKey).sort()
   const actual = scheduling.executed.map(timingKey).sort()
   if (new Set(expected).size !== expected.length || JSON.stringify(expected) !== JSON.stringify(actual) || scheduling.executed.some(item => item.state !== 'passed' || item.test_cases.passed !== item.test_cases.collected || !Number.isFinite(item.duration_ms) || item.duration_ms <= 0)) return

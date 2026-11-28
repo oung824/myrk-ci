@@ -432,11 +432,10 @@ async def stopped(context: CaseContext) -> CaseOutcome:
                "partial_file": marker.read_text() if marker.is_file() else None}, evidence={"script": script, "partial": marker})
 
 
-def register(registry: CaseRegistry, *, include_delivery_materials: bool = True) -> None:
-    if include_delivery_materials:
-        bindings = tuple(sorted(MATERIALS.iterdir()))
-        for name in ("delivery", "pending-registration", "answer-divergence"):
-            registry.register(AcceptanceCase(f"delegation.{name}", "delegation", ("deepseek", "openai-chat", "google"), delivery, bindings))
+def register(registry: CaseRegistry) -> None:
+    bindings = tuple(sorted(MATERIALS.iterdir()))
+    for name in ("delivery", "pending-registration", "answer-divergence"):
+        registry.register(AcceptanceCase(f"delegation.{name}", "delegation", ("deepseek", "openai-chat", "google"), delivery, bindings))
     registry.register(AcceptanceCase("skills.selected", "skills", ("deepseek", "openai-chat", "google"), selected_skill))
     registry.register(AcceptanceCase("plans.update", "plans", ("deepseek", "openai-chat", "google"), plan))
     for name in ("allow", "deny", "failure", "stop", "stale-schema"):

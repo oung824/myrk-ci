@@ -6,12 +6,25 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { finished } from 'node:stream/promises'
 import { createTestRun, finishTestRun, prepareTestArguments } from './run-context.mjs'
+import { recordDesktopLaunch, settleDesktopLaunch } from './test-receipts.mjs'
 import { prepareScheduling, updateTimingIndex } from './test-timings.mjs'
 
 const desktop = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const source = dirname(desktop)
-const run = await createTestRun(source)
+let activeChild
 let report
+let dispatched = false
+let interrupted = false
+let startupFailed = false
+function interrupt() {
+  if (interrupted) return
+  interrupted = true
+  activeChild?.kill('SIGINT')
+}
+process.on('SIGINT', interrupt)
+process.on('SIGTERM', interrupt)
+const run = await createTestRun(source)
+const launch = await recordDesktopLaunch(run, process.argv.slice(2))
 try {
   console.info(`Myrk test run: ${run.directory}`)
   const mode = run.environment.MYRK_TEST_SCHEDULING ?? 'duration'
@@ -53,9 +66,12 @@ try {
   await writeFile(join(run.directory, 'protected-before.json'), JSON.stringify(before, null, 2))
 
   async function command(name, arguments_) {
+    if (interrupted) return 1
     const stdout = createWriteStream(join(run.directory, `${name}-stdout.txt`))
     const stderr = createWriteStream(join(run.directory, `${name}-stderr.txt`))
     const child = spawn(process.execPath, arguments_, { cwd: desktop, env: run.environment, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
+    activeChild = child
+    dispatched = true
     const started = new Date().toISOString()
     child.stdout.on('data', data => { stdout.write(data); process.stdout.write(data) })
     child.stderr.on('data', data => { stderr.write(data); process.stderr.write(data) })
@@ -64,6 +80,9 @@ try {
       child.once('error', error => { startError = String(error); stderr.write(startError + '\n'); process.stderr.write(startError + '\n') })
       child.once('close', (code, signal) => resolveResult({ code, signal }))
     })
+    activeChild = undefined
+    interrupted ||= ['SIGINT', 'SIGTERM'].includes(result.signal)
+    startupFailed ||= startError !== ''
     stdout.end(); stderr.end()
     await Promise.all([finished(stdout), finished(stderr)])
     await writeFile(join(run.directory, `${name}-process.json`), JSON.stringify({ executable: process.execPath, argv: arguments_, cwd: desktop, pid: child.pid, started, ended: new Date().toISOString(), startError, ...result }, null, 2))
@@ -84,6 +103,8 @@ try {
     Object.assign(scheduling, JSON.parse(await readFile(join(run.directory, 'scheduling-observed.json'), 'utf8')))
     scheduling.planned = JSON.parse(await readFile(join(run.directory, 'scheduling-plan.json'), 'utf8'))
   }
+  interrupted ||= scheduling.reason === 'interrupted'
+  if (interrupted) scheduling.reason = 'interrupted'
   const after = await protectedFiles()
   await writeFile(join(run.directory, 'protected-after.json'), JSON.stringify(after, null, 2))
   const leftovers = (await readdir(desktop)).filter(name => name.startsWith('electron.vite.config.') && name.endsWith('.mjs'))
@@ -110,13 +131,11 @@ try {
   })
 }
 try {
+  if (interrupted) report.result ||= 1
+  const status = interrupted ? 'interrupted' : startupFailed || !dispatched ? 'startup_failed' : report.result === 0 ? 'passed' : 'failed'
   const resultPath = await finishTestRun(run, report)
-  if (report.result === 0) {
-    await updateTimingIndex(run, report.scheduling)
-    const receipt = JSON.parse(await readFile(resultPath, 'utf8'))
-    receipt.scheduling = report.scheduling
-    await writeFile(resultPath, JSON.stringify(receipt, null, 2))
-  }
+  if (report.result === 0) await updateTimingIndex(run, report.scheduling)
+  await settleDesktopLaunch(launch, resultPath, report, status)
   console.info(`Myrk check result: ${resultPath}`)
 } catch (error) {
   console.error(`Check cleanup failed; retained ${run.directory}: ${error.message}`)
@@ -125,4 +144,6 @@ try {
   })
   report.result = 1
 }
+process.removeListener('SIGINT', interrupt)
+process.removeListener('SIGTERM', interrupt)
 process.exitCode = report.result

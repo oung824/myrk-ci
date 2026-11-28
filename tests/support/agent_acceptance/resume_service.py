@@ -15,6 +15,7 @@ from pydantic_ai import models
 from pydantic_ai.models import Model
 
 from myrk.desktop_service import serve
+from myrk.observed_http import ObservedHTTPTransport
 from myrk.provider import deepseek_model
 from myrk.request_observation import current_request_attempt
 from tests.support.agent_acceptance.replay import OfflineSession, Reply, SDKCapture
@@ -139,7 +140,7 @@ async def main() -> None:
             os._exit(71)
 
     sys.addaudithook(interrupt)
-    client = ReplayClient(transport=httpx2.MockTransport(respond), trust_env=False)
+    client = ReplayClient(transport=ObservedHTTPTransport(httpx2.MockTransport(respond)), trust_env=False)
 
     @asynccontextmanager
     async def factory(key: str) -> AsyncIterator[Model]:

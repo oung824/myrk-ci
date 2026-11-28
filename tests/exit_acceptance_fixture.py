@@ -44,12 +44,15 @@ if __name__ == "__main__":
     role = sys.argv[1] if len(sys.argv) > 1 else "service"
     if role == "service":
         from myrk.desktop_service import main
+    if role == "check":
+        os.environ.update(json.loads(Path(sys.argv[2]).read_text(encoding="utf-8")))
     directory = Path(os.environ["MYRK_EXIT_CASE_DIRECTORY"])
     receipt = write_process_receipt(Path(os.environ["MYRK_PROCESS_RECEIPT_DIRECTORY"]), __file__)
     if receipt is None:
         raise SystemExit(0)
     with (directory / "roles.jsonl").open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps({"role": role, "pid": os.getpid(), "parent_pid": os.getppid(), "receipt": str(receipt), "at": time.time()}) + "\n")
+        stream.write(json.dumps({"role": role, "pid": os.getpid(), "parent_pid": os.getppid(),
+            "receipt": str(receipt), "at": time.time(), "argv": [sys.executable, *sys.orig_argv[1:]]}) + "\n")
     stop = Path(os.environ["MYRK_TEST_NORMAL_EXIT_FLAG"])
     if role == "check":
         assert (directory / "notes.txt").read_text(encoding="utf-8") == "苹果 5\n"

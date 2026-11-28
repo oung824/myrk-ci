@@ -56,7 +56,7 @@ def test_formal_service_saves_shutdown_evidence_without_reopening_shared_stop(
     monkeypatch.setattr(formal_service, "verify_authority", lambda _path: (value, gate))
     monkeypatch.setattr(formal_service, "write_process_receipt", lambda *_args: None)
     monkeypatch.setattr(formal_service.sys, "addaudithook", lambda _hook: None)
-    monkeypatch.setattr(formal_service, "serve", serve_saved_cancellation)
+    monkeypatch.setattr(formal_service.desktop_service, "serve", serve_saved_cancellation)
     closed = []
     close = httpx2.AsyncClient.aclose
 

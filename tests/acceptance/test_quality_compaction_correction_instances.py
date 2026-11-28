@@ -12,7 +12,7 @@ from tests.support.agent_acceptance.quality_materials import build_implementatio
 @pytest.fixture
 def correction_packet(request, monkeypatch):
     variant = getattr(request, 'param', None)
-    if variant in {'variant', 'desktop-variant', 'missing-prior-source'}:
+    if variant in {'variant', 'desktop-variant'}:
         from tests.support.agent_acceptance import quality_compaction
         from tests.support.agent_acceptance.quality_compaction_correction import ATTENDANCE, ROSTER
         from tests.support.agent_acceptance.quality_runtime import QualitySource
@@ -29,8 +29,7 @@ def correction_packet(request, monkeypatch):
             if variant == 'desktop-variant':
                 sources = dict(list(sources.items())[:4])
             sources[ATTENDANCE] = QualitySource(text='Frozen attendance register. volunteers=31.\n', encoding='utf-8-sig')
-            if variant != 'missing-prior-source':
-                sources[ROSTER] = QualitySource(text='Frozen roster check. Only the stopped task may read this.\n')
+            sources[ROSTER] = QualitySource(text='Frozen roster check. Only the stopped task may read this.\n')
             return visible.model_copy(update={
                 'goal': visible.goal.replace('from12 to9', 'from13 to14'),
                 'parameters': {**visible.parameters, 'source_documents': documents, 'historical_shift_count': 13, 'current_shift_count': 14},
@@ -85,13 +84,31 @@ def test_qg6_correction_preserves_real_completed_and_cancelled_tasks(correction_
     assert outcome.facts['output_domain_criteria']['human_review']=='not_performed'
 
 
-@pytest.mark.parametrize('correction_packet', ['missing-prior-source'], indirect=True)
-def test_qg6_explicit_correction_requires_frozen_prior_task_sources(correction_packet, acceptance_public_root):
-    from tests.support.agent_acceptance.quality_runtime import bind_packet
+@pytest.mark.parametrize('missing', ['attendance.txt', 'roster-check.txt'])
+def test_qg6_explicit_correction_requires_frozen_prior_task_sources(monkeypatch, missing):
+    from tests.support.agent_acceptance import quality_compaction
+    from tests.support.agent_acceptance.quality_packet import PACKETS
 
-    with pytest.raises(ValueError, match='both frozen prior-task sources'):
-        bind_packet(correction_packet, 'QG6.formal.9', acceptance_public_root)
-    assert not (acceptance_public_root / 'materials/roster-check.txt').exists()
+    original_projection = quality_compaction.project_input
+
+    def project_without_prior_source(visible):
+        projected = original_projection(visible)
+        if projected.adapter != 'qg6-9':
+            return projected
+        sources = {name: source for name, source in projected.sources.items() if name != missing}
+        return projected.model_copy(update={'sources': sources})
+
+    monkeypatch.setattr(quality_compaction, 'project_input', project_without_prior_source)
+    packet = SOURCE / PACKETS / ('correction-missing-prior-' + uuid4().hex)
+    try:
+        with pytest.raises(ValueError, match='both frozen prior-task sources'):
+            build_implementation_quality_packet(packet)
+        assert not (packet / 'input/QG6.formal.9.json').exists()
+        assert not (packet / 'gold/QG6.formal.9.json').exists()
+        assert not (packet / 'freeze.json').exists()
+    finally:
+        if packet.is_dir():
+            shutil.rmtree(packet)
 
 
 
@@ -267,139 +284,3 @@ def test_normal_summary_with_historical_cancelled_goal_never_waits_for_another_s
     async def later_work():
         return await asyncio.wait_for(terminal_response_barrier('quality.qg6.formal.9',acceptance_public_root,2,future_work,response),.1)
     assert asyncio.run(later_work()) is response and marker.read_bytes()==original_marker
-
-
-def assert_unknown_reservations(ledger,*,execution_id,cancelled_task_id):
-    unknown=[item for item in ledger['attempts'] if item['state']=='unknown']
-    assert unknown
-    assert all(item['occupied_microusd']==item['reservation_microusd']>0 and item['supplier_final_microusd'] is None for item in unknown)
-    owners=ledger['product_request_owners']
-    assert any(item['execution_id']==execution_id and owners[str(item['number'])]['task_id']==cancelled_task_id for item in unknown)
-    assert execution_id+':'+cancelled_task_id in ledger['product_task_stops']
-    return unknown
-
-def main_probe(request_path: Path, output: Path) -> None:
-    import subprocess
-    import sys
-    from tests.acceptance.test_candidate_refreeze import approve_candidate, PROMPT
-    from tests.support.agent_acceptance import AcceptancePlan, LiveAuthorization, LiveGate, builtin_registry, prepare_live
-    from tests.support.agent_acceptance.formal import environment
-    from tests.support.agent_acceptance.preparation import LiveExecutionRequest, bundle_material_root, read_prepared_snapshot
-    value=json.loads(request_path.read_bytes())
-    plan=AcceptancePlan.model_validate(value['plan'])
-    root=Path(value['run_root'])
-    registry=builtin_registry(quality_packet=plan.quality_packet)
-    bundle=prepare_live(plan,root=root,registry=registry)
-    grant=LiveAuthorization(authorization_id='synthetic-correction-genesis',binding=bundle.binding,total_limit=68,
-        case_limits={'tuning':8,'formal':60},total_microusd=1002728,case_microusd={'tuning':117968,'formal':884760},
-        transport='mock',parent_budget_id=plan.parent_budget.parent_id)
-    gate=LiveGate(root,registry,grant)
-    index=gate.parent_binding_path(plan.parent_budget.parent_id)
-    prompt=Path(PROMPT)
-    original=prompt.read_bytes()
-    def execute(current,identity):
-        directory=output/identity
-        directory.mkdir()
-        request=directory/'request.json'
-        request.write_text(LiveExecutionRequest(run_root=root,grant=current.authorization,execution_ids=(identity,)).model_dump_json(),encoding='utf-8')
-        code=bundle_material_root(read_prepared_snapshot(root,binding=current.authorization.binding))
-        process=subprocess.run([sys.executable,'-B','-m','tests.support.agent_acceptance.formal_cli','execute',str(request),'--output',str(directory/'execution')],
-            cwd=code,env={**environment(directory/'controller-environment'),'PYTHONPATH':str(code)},capture_output=True)
-        (directory/'controller.stdout').write_bytes(process.stdout)
-        (directory/'controller.stderr').write_bytes(process.stderr)
-        assert process.returncode==0,process.stderr.decode('utf-8',errors='replace')
-        result=json.loads((directory/'execution/result.json').read_bytes())
-        return next(item for item in result['cases'] if item['execution_id']==identity)
-    try:
-        tuning=execute(gate,'tuning')
-        assert tuning['tool_status']==tuning['product_status']=='passed',tuning['facts']
-        before=gate.accounting_report()
-        prompt.write_bytes(original+b'\nExplicit private synthetic correction candidate revision.\n')
-        candidate=gate.propose_candidate()
-        assert gate.accounting_report()['actual_http']==before['actual_http']
-        current=approve_candidate(gate,candidate)
-        formal=execute(current,'formal')
-        (output/'final-ledger.original.json').write_bytes((root/'ledger.json').read_bytes())
-        (output/'probe-report.json').write_text(json.dumps({'tuning':tuning,'formal':formal,'before':before,'after':current.accounting_report()},ensure_ascii=False,indent=2),encoding='utf-8')
-    finally:
-        if (root/'ledger.json').is_file():
-            (output/'final-ledger.original.json').write_bytes((root/'ledger.json').read_bytes())
-        prompt.write_bytes(original)
-        if index.exists():index.unlink()
-
-
-@pytest.mark.acceptance_desktop
-@pytest.mark.parametrize('correction_packet', ['desktop-variant'], indirect=True)
-def test_qg6_actual_main_keeps_cancelled_unknown_occupied_in_the_same_candidate_parent(prepared_root,acceptance_public_root,correction_packet):
-    import subprocess
-    import sys
-    from hashlib import sha256
-    from zipfile import ZipFile, ZIP_DEFLATED
-    from myrk.project_paths import project_root
-    from tests.support.agent_acceptance import AcceptancePlan, FrozenExecution, FrozenParentBudget, builtin_registry
-    from tests.support.agent_acceptance.formal import environment
-    from tests.support.agent_acceptance.preparation import bound_files
-    from tests.support.agent_acceptance.quality_packet import read_quality_packet
-    packet=read_quality_packet(correction_packet)
-    rows=[]
-    for order,(identity,task_id,cap,cost) in enumerate((('tuning','QG1.tuning.1',8,117968),('formal','QG6.formal.9',60,884760)),1):
-        task=next(item for item in packet.tasks if item.task_id==task_id)
-        rows.append(FrozenExecution(execution_id=identity,case_id='quality.'+task_id.lower(),protocol='deepseek',scenario_id=task_id,
-            material_family_id=task.material_family_id,material_variant='baseline',material_path=task.input_path,material_sha256=packet.files[task.input_path.as_posix()],
-            startpoint=identity,order=order,stage='quality',request_cap=cap,cost_cap_microusd=cost))
-    parent=FrozenParentBudget(parent_id='synthetic-correction-refreeze-'+prepared_root.name,accounting_root=prepared_root,request_cap=68,
-        phase_microusd={'screening':0,'quality':1002728,'judge':0},reserve_microusd=0,profile='synthetic')
-    plan=AcceptancePlan(executions=tuple(rows),parent_budget=parent,quality_packet=correction_packet,mode='prepare-live')
-    registry=builtin_registry(quality_packet=correction_packet)
-    files=bound_files(plan,registry)
-    identity=uuid4().hex
-    source_parent=project_root(SOURCE)/'.scratch/qsrc'
-    controller=source_parent/identity
-    output=acceptance_public_root
-    output.mkdir(parents=True)
-    try:
-        controller.mkdir(parents=True,exist_ok=False)
-        (controller/'owner.json').write_text(json.dumps({'owner':'synthetic-correction-source-controller','identity':identity,'authority_created':False}),encoding='utf-8')
-        with ZipFile(output/'controller-source-originals.zip','x',ZIP_DEFLATED) as archive:
-            for name,expected in files.items():
-                body=(SOURCE/name).read_bytes()
-                assert sha256(body).hexdigest()==expected
-                target=controller/name
-                target.parent.mkdir(parents=True,exist_ok=True)
-                target.write_bytes(body)
-                archive.writestr(name,body)
-        request=output/'probe-request.json'
-        request.write_text(json.dumps({'run_root':str(prepared_root),'plan':plan.model_dump(mode='json')}),encoding='utf-8')
-        process=subprocess.run([sys.executable,'-B','-m','tests.acceptance.test_quality_compaction_correction_instances',str(request),str(output)],
-            cwd=controller,env={**environment(output/'source-controller-environment'),'PYTHONPATH':str(controller)},capture_output=True)
-        (output/'probe.stdout').write_bytes(process.stdout)
-        (output/'probe.stderr').write_bytes(process.stderr)
-        assert process.returncode==0,process.stderr.decode('utf-8',errors='replace')
-        report=json.loads((output/'probe-report.json').read_bytes())
-        formal=report['formal']
-        assert formal['tool_status']==formal['product_status']=='passed',formal['facts']
-        contract=formal['facts']['quality_compaction_contract']
-        assert (contract['historical_shift_count'], contract['current_shift_count']) == (13, 14)
-        for name in ('actual_attendance_completed','actual_roster_cancelled','distinct_task_ids','old_tasks_unchanged',
-            'first_normal_summary_id','old_summary_original_unchanged','correction_applied_after_summary','all_actual_sources_read',
-            'source_mapping_readable','no_completed_or_cancelled_source_reread','source_originals_unchanged','actual_answer_delivered','cancelled_request_usage_unmeasured'):
-            assert contract[name],(name,contract)
-        assert report['after']['attempts'][:len(report['before']['attempts'])]==report['before']['attempts']
-        ledger=json.loads((output/'final-ledger.original.json').read_bytes())
-        receiver_state=next(json.loads(path.read_bytes()) for path in (output/'formal/execution').rglob('state.json') if path.parent.name=='receiver')
-        cancelled_task=receiver_state['quality_compaction']['cancelled_task_id']
-        unknown=assert_unknown_reservations(ledger,execution_id='formal',cancelled_task_id=cancelled_task)
-        cancelled_number=next(item['number'] for item in unknown if ledger['product_request_owners'][str(item['number'])]['task_id']==cancelled_task)
-        assert any(item['number']>cancelled_number and item['state']=='response_complete' for item in ledger['attempts'])
-        assert not ledger['stopped'] and not ledger['case_stops'] and formal['facts']['real_http_attempts']==0
-        assert formal['semantic_status']=='not_measured' and report['after']['actual_http']<=68
-    finally:
-        if controller.exists():
-            assert controller.resolve().parent==source_parent.resolve() and controller.name==identity
-            assert json.loads((controller/'owner.json').read_bytes())['identity']==identity
-            shutil.rmtree(controller)
-
-
-if __name__=='__main__':
-    import sys
-    main_probe(Path(sys.argv[1]),Path(sys.argv[2]))

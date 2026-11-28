@@ -5,10 +5,8 @@ import ctypes
 from ctypes import wintypes
 from datetime import datetime, timezone
 import json
-import io
 import os
 from pathlib import Path
-import shutil
 import shlex
 import subprocess
 import sys
@@ -23,13 +21,10 @@ SOURCE_ROOT = Path(__file__).resolve().parents[1]
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(SOURCE_ROOT))
 from myrk.project_paths import project_root
-from myrk.check_outputs import report_path, retain_reports, validate_pytest_arguments
+from myrk.check_outputs import CheckLaunch, configuration_path, confine_outputs, finalize_check_outputs, settle_backend_launch
+from myrk.windows_jobs import job_exit_poll_delays, terminate_job
 
 ROOT = project_root(SOURCE_ROOT)
-
-
-class _Accounting(ctypes.Structure):
-    _fields_ = [(name, ctypes.c_longlong) for name in ("user", "kernel", "period_user", "period_kernel")] + [(name, wintypes.DWORD) for name in ("faults", "total", "active", "terminated")]
 
 
 BOOTSTRAP = """import ctypes,json,os,runpy,sys
@@ -53,114 +48,11 @@ runpy.run_module(module,run_name='__main__',alter_sys=True)
 """
 
 
-def confine_outputs(check: str, arguments: list[str], run: Path) -> list[str]:
-    """Resolve supported tool output switches inside this command's owned run."""
-    rewritten = list(arguments)
-    if check == "pytest":
-        validate_pytest_arguments([*rewritten, *shlex.split(os.environ.get("PYTEST_ADDOPTS", ""))])
-        config_file = None
-        for index, argument in enumerate(rewritten):
-            if argument in {"-c", "--config-file"}:
-                if index + 1 == len(rewritten):
-                    raise ValueError("Pytest configuration requires a project-local path.")
-                config_file = rewritten[index + 1]
-            elif argument.startswith("--config-file="):
-                config_file = argument.partition("=")[2]
-            elif argument.startswith("-c"):
-                config_file = argument[2:]
-        configuration = Path(config_file) if config_file is not None else SOURCE_ROOT / "pyproject.toml"
-        if not configuration.is_absolute():
-            configuration = SOURCE_ROOT / configuration
-        if ".." in configuration.parts or any(part.is_symlink() or part.is_junction() for part in (configuration, *configuration.parents)) or not configuration.resolve().is_relative_to(ROOT):
-            raise ValueError("Pytest configuration must be an ordinary project-local path.")
-        rewritten.append("--config-file=" + str(configuration.resolve()))
-    if check == "mypy":
-        if any(argument.startswith("@") for argument in rewritten):
-            raise ValueError("Mypy response files can hide output paths; pass their arguments directly.")
-        from mypy.config_parser import parse_config_file
-        from mypy.main import define_options
-        from mypy.options import Options
-
-        option_parser, _, _ = define_options(stdout=io.StringIO(), stderr=io.StringIO())
-        for index, argument in enumerate(rewritten):
-            flag, separator, value = argument.partition("=")
-            if flag == "--":
-                break
-            if not flag.startswith("--") or flag in option_parser._option_string_actions:
-                continue
-            matches = [name for name in option_parser._option_string_actions if name.startswith(flag)]
-            if len(matches) == 1:
-                rewritten[index] = matches[0] + ("=" + value if separator else "")
-        config_file = None
-        for index, argument in enumerate(rewritten):
-            if argument == "--config-file" and index + 1 < len(rewritten):
-                config_file = rewritten[index + 1]
-            elif argument.startswith("--config-file="):
-                config_file = argument.partition("=")[2]
-        if config_file is None:
-            config_file = next((str(SOURCE_ROOT / name) for name in ("mypy.ini", ".mypy.ini", "pyproject.toml", "setup.cfg") if (SOURCE_ROOT / name).is_file()), "")
-            rewritten.append("--config-file=" + config_file)
-        if config_file:
-            configured = Options()
-            filename = Path(config_file)
-            if not filename.is_absolute():
-                filename = SOURCE_ROOT / filename
-            parse_config_file(configured, lambda: None, str(filename), stdout=io.StringIO(), stderr=io.StringIO())
-            existing = {argument.partition("=")[0] for argument in rewritten}
-            for kind, location in configured.report_dirs.items():
-                flag = "--" + kind + "-report"
-                if flag not in existing:
-                    rewritten.extend([flag, location])
-            if configured.junit_xml and "--junit-xml" not in existing:
-                rewritten.extend(["--junit-xml", configured.junit_xml])
-    index = 0
-    while index < len(rewritten):
-        argument = rewritten[index]
-        flag, separator, value = argument.partition("=")
-        if check == "pytest" and flag == "--debug" and not separator and (index + 1 == len(rewritten) or rewritten[index + 1].startswith("-")):
-            separator, value = "=", "pytestdebug.log"
-        if flag in {"-o", "--override-ini"}:
-            override = value if separator else (rewritten[index + 1] if index + 1 < len(rewritten) else "")
-            if override.startswith("log_file="):
-                destination = report_path(override.partition("=")[2], kind="log_file", run=run, project=ROOT, source=SOURCE_ROOT)
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                rewritten[index if separator else index + 1] = (flag + "=" if separator else "") + "log_file=" + str(destination)
-            index += 1 if separator else 2
-            continue
-        output_flag = flag in {"--junitxml", "--junit-xml", "--log-file", "--html", "--json-report-file", "--output-file"}
-        output_flag = output_flag or (check == "pytest" and flag == "--debug")
-        output_flag = output_flag or (check == "mypy" and flag.startswith("--") and flag.endswith("-report"))
-        coverage = flag == "--cov-report"
-        if not output_flag and not coverage:
-            index += 1
-            continue
-        if not separator:
-            index += 1
-            if index >= len(rewritten):
-                raise ValueError(f"Output option {flag} requires a path.")
-            value = rewritten[index]
-        prefix = ""
-        if coverage:
-            kind, colon, location = value.partition(":")
-            if kind in {"term", "term-missing", "annotate"} and not colon:
-                if kind != "annotate":
-                    index += 1
-                    continue
-            if kind == "" or kind.startswith("term"):
-                index += 1
-                continue
-            prefix = kind + ":"
-            value = location if colon else {"xml": "coverage.xml", "json": "coverage.json", "lcov": "coverage.lcov"}.get(kind, "coverage-" + kind)
-        destination = report_path(value, kind=flag, run=run, project=ROOT, source=SOURCE_ROOT)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        rewritten[index] = (flag + "=" if separator else "") + prefix + str(destination)
-        index += 1
-    return rewritten
-
-
 def run_check(
     check: str, arguments: list[str], *, stop: threading.Event | None = None,
-    below_normal: bool = False,
+    below_normal: bool = False, invocation_id: str | None = None,
+    parent_invocation_id: str | None = None, group: str | None = None,
+    version: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run an owned backend check and save its complete result before returning."""
     if check not in {"pytest", "mypy", "all"}:
@@ -175,9 +67,12 @@ def run_check(
         directory.mkdir(parents=True, exist_ok=True)
     run = Path(tempfile.mkdtemp(prefix="b-", dir=parent))
     result_path = results / f"{run.name}.json"
+    invocation_id = invocation_id or uuid4().hex
+    launch_record = CheckLaunch(ROOT, SOURCE_ROOT, result_path, invocation_id, check, arguments,
+                               parent=parent_invocation_id, group=group, version=version)
     owner = {
         "owner": f"backend-check:{run.name}", "pid": os.getpid(),
-        "invocation_id": uuid4().hex,
+        "invocation_id": invocation_id,
         "project_root": str(ROOT), "source_root": str(SOURCE_ROOT), "runtime_directory": str(run),
         "started_at": datetime.now(timezone.utc).isoformat(),
         "reason": "Backend check runtime; the command owns all generated files.",
@@ -189,7 +84,7 @@ def run_check(
     failure_logs: list[str] = []
     result: dict[str, Any] = {
         **owner, "commands": commands, "exit_code": 0, "result_path": str(result_path),
-        "runtime_removed": False, "failure_logs": failure_logs,
+        "runtime_removed": False, "failure_logs": failure_logs, "mode": check,
     }
     processes: list[subprocess.Popen[Any]] = []
     jobs: list[dict[str, Any]] = []
@@ -203,8 +98,6 @@ def run_check(
         kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
         kernel.OpenProcess.argtypes, kernel.OpenProcess.restype = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD], wintypes.HANDLE
         kernel.IsProcessInJob.argtypes = [wintypes.HANDLE, wintypes.HANDLE, ctypes.POINTER(wintypes.BOOL)]
-        kernel.TerminateJobObject.argtypes = [wintypes.HANDLE, wintypes.UINT]
-        kernel.QueryInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p]
         kernel.WaitForSingleObject.argtypes, kernel.WaitForSingleObject.restype = [wintypes.HANDLE, wintypes.DWORD], wintypes.DWORD
         kernel.CloseHandle.argtypes = [wintypes.HANDLE]
         if below_normal:
@@ -239,10 +132,12 @@ def run_check(
             try:
                 with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open("w", encoding="utf-8") as stderr:
                     try:
-                        command.extend(confine_outputs(check, arguments, run))
+                        command.extend(confine_outputs(check, arguments, run, source=SOURCE_ROOT, project=ROOT))
                         if check == "pytest":
+                            launch_record.bind_pytest_config(configuration_path(arguments, SOURCE_ROOT))
+                            command += ["--config-file=" + launch_record.record["source_version"]["pytest_config"]["path"]]
                             command += ["-p", "myrk.check_plugin"]
-                            command += ["--basetemp", str(run / "fixtures"), "-o", f"cache_dir={run / 'cache/pytest'}", "-o", f"pythonpath={shlex.quote(SOURCE_ROOT.as_posix())}"]
+                            command += ["--basetemp", str(run / "fixtures"), "-o", f"pythonpath={shlex.quote(SOURCE_ROOT.as_posix())}"]
                         else:
                             command += ["--cache-dir", str(run / "cache/mypy")]
                         job = kernel.CreateJobObjectW(None, None)
@@ -354,19 +249,10 @@ def run_check(
         for owned_job in jobs:
             job = owned_job["handle"]
             try:
-                if not kernel.TerminateJobObject(job, 1):
-                    raise ctypes.WinError(ctypes.get_last_error())
-                accounting = _Accounting()
-                deadline = monotonic() + 5
-                while True:
-                    if not kernel.QueryInformationJobObject(job, 1, ctypes.byref(accounting), ctypes.sizeof(accounting), None):
-                        raise ctypes.WinError(ctypes.get_last_error())
-                    if accounting.active == 0:
-                        owned_job["entry"]["job_active_processes"] = 0
-                        break
-                    if monotonic() >= deadline:
-                        raise OSError(f"Owned check job still contains {accounting.active} processes.")
-                    sleep(.01)
+                terminate_job(kernel, job)
+                for delay in job_exit_poll_delays(kernel, job, timeout=5):
+                    sleep(delay)
+                owned_job["entry"]["job_active_processes"] = 0
                 if owned_job["bootstrap_pending"]:
                     raise OSError("Startup was interrupted before the real interpreter's job membership was confirmed; its runtime is retained.")
             except (OSError, KeyboardInterrupt) as error:
@@ -396,54 +282,11 @@ def run_check(
             except (OSError, subprocess.TimeoutExpired, KeyboardInterrupt) as error:
                 stop_errors.append(f"Child process {process.pid}: {error}")
         result["exit_code"] = result["exit_code"] or next((entry["exit_code"] for entry in commands if entry["exit_code"]), 0)
-        try:
-            for check, entry in zip(checks, commands):
-                stdout_path, stderr_path = run / f"{check}.stdout.txt", run / f"{check}.stderr.txt"
-                entry["output_tail"] = stdout_path.read_text(encoding="utf-8", errors="replace")[-2000:] if stdout_path.exists() else ""
-                if entry["exit_code"]:
-                    for source in (stdout_path, stderr_path):
-                        if source.is_file():
-                            destination = results / f"{run.name}.{source.name}"
-                            source.replace(destination)
-                            failure_logs.append(str(destination))
-        except OSError as error:
-            stop_errors.append(f"Cannot save the check output: {error}")
-        if stop_errors:
-            result["cleanup_error"] = "; ".join(stop_errors)
-        else:
-            try:
-                retained_reports = retain_reports(run, result_path, owner=str(owner["owner"]))
-                if retained_reports is not None:
-                    result["retained_reports"] = retained_reports
-            except (OSError, ValueError) as error:
-                result["cleanup_error"] = str(error)
-        if "cleanup_error" in result:
-            pass
-        elif any(path.is_symlink() or path.is_junction() for path in (run, *run.parents)) or run.parent != parent:
-            result["cleanup_error"] = "The check runtime path changed; automatic removal was refused."
-        else:
-            try:
-                shutil.rmtree(run)
-                result["runtime_removed"] = not run.exists()
-                if not result["runtime_removed"]:
-                    result["cleanup_error"] = "The check runtime still exists after removal."
-            except OSError as error:
-                result["cleanup_error"] = str(error)
-    if failure_logs:
-        result["retained"] = {
-            "owner": owner["owner"], "reason": "Original output of a failed backend check.",
-            "delete_when": "The failure is resolved or its necessary evidence is saved with the task.",
-            "paths": failure_logs,
-        }
-    if not result["runtime_removed"]:
-        result["exit_code"] = result["exit_code"] or 1
-        result["retained_runtime"] = {
-            "path": str(run), "owner": owner["owner"],
-            "reason": result["cleanup_error"],
-            "delete_when": "The recorded process has exited and the path is ordinary and no longer locked.",
-        }
+        if "pytest" in checks:
+            launch_record.collect_backend_pytest_coverage(run, result)
+        finalize_check_outputs(run, parent, result_path, result, checks, commands, stop_errors)
     result["finished_at"] = datetime.now(timezone.utc).isoformat()
-    result_path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    settle_backend_launch(launch_record, result, checks, commands)
     return result
 
 

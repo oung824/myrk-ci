@@ -84,6 +84,13 @@ GROUPS = {
         'test_review_tool_recovery_http',
     ),
 }
+INTEGRATED_GROUPS = {
+    'integrated-runner-scheduling': (
+        'test_parallel_checks', 'test_parallel_check_scheduling',
+        'test_parallel_check_interrupt', 'test_process_observation',
+    ),
+    'integrated-runner-receipts': ('test_closeout_runs', 'test_closeout_borrowed'),
+}
 PHASES = {'setup', 'call', 'teardown'}
 RESULTS = ROOT / '.scratch/check-runs/results'
 SYNTHETIC_COUNTS = {
@@ -307,10 +314,11 @@ def node_outcomes(expected, observation):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('group', choices=GROUPS)
+    parser.add_argument('group', choices=(*GROUPS, *INTEGRATED_GROUPS))
     parser.add_argument('--native-only', action='store_true')
     parser.add_argument('--diagnostic-file', choices=DIAGNOSTIC_FILES)
     parser.add_argument('--failed-cases-only', action='store_true')
+    parser.add_argument('--expected-count', type=int)
     arguments = parser.parse_args()
     group = arguments.group
     if arguments.native_only and group != 'judge-fixtures':
@@ -319,6 +327,8 @@ def main():
         parser.error('--diagnostic-file must match its registered group')
     if arguments.failed_cases_only and not arguments.diagnostic_file:
         parser.error('--failed-cases-only requires --diagnostic-file')
+    if arguments.expected_count is not None and arguments.expected_count < 1:
+        parser.error('--expected-count must be positive')
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     environment = dict(os.environ, PYTHONIOENCODING='utf-8', MYRK_TASK_ID=f'github-public-backend-{group}')
     for name in ('GITHUB_STEP_SUMMARY', 'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE',
@@ -326,7 +336,8 @@ def main():
         environment.pop(name, None)
     publish(summary, f'### Public offline backend · {group}')
     publish(summary, 'Selected backend test files on a Windows hosted runner.')
-    names = ('acceptance/test_judge_native_roundtrip',) if arguments.native_only else GROUPS[group]
+    groups = INTEGRATED_GROUPS if group in INTEGRATED_GROUPS else GROUPS
+    names = ('acceptance/test_judge_native_roundtrip',) if arguments.native_only else groups[group]
     if arguments.diagnostic_file:
         names = (arguments.diagnostic_file,)
     paths = tuple(f'tests/{name}.py' for name in names)
@@ -340,7 +351,7 @@ def main():
     started = monotonic()
     stage = 'inventory'
     try:
-        inventory = [name for names in GROUPS.values() for name in names]
+        inventory = [name for names in groups.values() for name in names]
         if len(inventory) != len(set(inventory)) or any(not (ROOT / path).is_file() for path in paths):
             raise CheckError('A test file is duplicated across groups or missing from this group.')
         stage = 'collection'
@@ -355,6 +366,8 @@ def main():
         publish(summary, f'- Collected {len(expected)} tests across {len(counts)}/{len(paths)} selected files.')
         if set(counts) != set(paths) or len(expected) != len(set(expected)):
             raise CheckError('The collected files or test identities differ from the selection.')
+        if arguments.expected_count is not None and len(expected) != arguments.expected_count:
+            raise CheckError(f'Expected {arguments.expected_count} tests in this integrated diagnostic file.')
         if arguments.failed_cases_only and set(expected) != set(selection):
             raise CheckError('The collected cases differ from the reproduced failures.')
         if not arguments.diagnostic_file and group in SYNTHETIC_COUNTS and (len(expected) != SYNTHETIC_COUNTS[group]

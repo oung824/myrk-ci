@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator, Callable, Hashable, Iterator
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field, replace
+from types import TracebackType
 from typing import Any, Literal, Self
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -8,23 +9,22 @@ from uuid import uuid4
 import httpx2
 from google.genai import errors
 from google.genai.types import ContentUnionDict, GenerateContentConfigDict, GenerateContentResponse, HttpRetryOptions
-from openai import AsyncOpenAI, OpenAIError
+from openai import AsyncOpenAI, DefaultAsyncHttpxClient, OpenAIError
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_ai._parts_manager import ModelResponsePartsManager
 from pydantic_ai.exceptions import ModelAPIError, ModelConnectionError, ModelHTTPError, ModelQuotaExceededError
 from pydantic_ai.messages import Citation, ModelMessage, ModelResponse, ModelResponsePart, ModelResponseStreamEvent, ProviderDetailsDelta, ThinkingPart
-from pydantic_ai.models import Model, ModelRequestParameters, StreamedResponse
+from pydantic_ai.models import Model, ModelRequestParameters, StreamedResponse, create_async_httpx2_client
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.models.google import GoogleModel, GoogleModelSettings
 from pydantic_ai.providers.deepseek import DeepSeekProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.providers.google import GoogleProvider
-from pydantic_ai.profiles.openai import OpenAIModelProfile
+
+from myrk.observed_http import ObservedHTTPTransport
+from myrk.provider_history import LegacySystemPromptModel
 
 ModelFactory = Callable[[str], AbstractAsyncContextManager[Model]]
-
-_DEEPSEEK_CHAT_PROFILE: OpenAIModelProfile = {"openai_chat_supports_max_completion_tokens": False}
-
 
 def is_temporary_model_error(error: Exception) -> bool:
     return isinstance(error, ModelConnectionError) or isinstance(error, ModelHTTPError) and not isinstance(error, ModelQuotaExceededError) and error.status_code in {408, 429, 500, 502, 503, 504}
@@ -205,26 +205,60 @@ async def fetch_model_catalog(key: str, connection: GoogleCatalogConnection, *, 
         raise ValueError(f"{phase}：网络连接失败，请检查网络后重试。") from None
 
 
+class _EnvironmentTransport(httpx2.AsyncBaseTransport):
+    """Keep HTTPX's default connection pools and environment proxy routing."""
+
+    def __init__(self, client: httpx2.AsyncClient) -> None:
+        self._client = client
+
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
+        return await self._client.send(request, stream=True, auth=None, follow_redirects=False)
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    async def __aenter__(self) -> Self:
+        await self._client.__aenter__()
+        return self
+
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None = None, exc_value: BaseException | None = None,
+        traceback: TracebackType | None = None,
+    ) -> None:
+        await self._client.__aexit__(exc_type, exc_value, traceback)
+
+
 @asynccontextmanager
 async def configured_model(key: str, config: ProviderConfig, *, http_client: httpx2.AsyncClient | None = None) -> AsyncIterator[Model]:
     if config.protocol == "google":
-        async with GoogleProvider(api_key=key, base_url=config.base_url, http_client=http_client, retry_options=HttpRetryOptions(attempts=1)) as google_provider:
-            yield _SingleRequestGoogleModel(config.model, provider=google_provider, settings={"max_retries": 0})
+        async with AsyncExitStack() as stack:
+            if http_client is None:
+                timeout = httpx2.Timeout(20 * 60, connect=5)
+                terminal_client = create_async_httpx2_client(timeout=timeout)
+                terminal_client.event_hooks = {}
+                transport = ObservedHTTPTransport(_EnvironmentTransport(terminal_client))
+                http_client = await stack.enter_async_context(create_async_httpx2_client(timeout=timeout, transport=transport))
+            google_provider = await stack.enter_async_context(GoogleProvider(
+                api_key=key, base_url=config.base_url, http_client=http_client, retry_options=HttpRetryOptions(attempts=1),
+            ))
+            google_model = _SingleRequestGoogleModel(
+                config.model, provider=google_provider, settings={"max_retries": 0, "framing_announcement": "always"},
+            )
+            yield LegacySystemPromptModel(google_model)
         return
+    if http_client is None:
+        openai_transport = ObservedHTTPTransport(_EnvironmentTransport(DefaultAsyncHttpxClient()))
+        http_client = DefaultAsyncHttpxClient(transport=openai_transport)
     async with AsyncOpenAI(api_key=key, base_url=config.base_url, http_client=http_client, max_retries=0) as client:
         provider = DeepSeekProvider(openai_client=client) if config.protocol == "deepseek" else OpenAIProvider(openai_client=client)
-        yield OpenAIChatModel(config.model, provider=provider,
-            profile=_DEEPSEEK_CHAT_PROFILE if config.protocol == "deepseek" else None)
+        chat_model = OpenAIChatModel(config.model, provider=provider, settings={"framing_announcement": "always"})
+        yield LegacySystemPromptModel(chat_model)
 
 
 @asynccontextmanager
 async def deepseek_model(key: str, *, http_client: httpx2.AsyncClient | None = None) -> AsyncIterator[Model]:
-    async with AsyncOpenAI(
-        api_key=key, base_url="https://api.deepseek.com", http_client=http_client, max_retries=0
-    ) as client:
-        yield OpenAIChatModel(
-            "deepseek-flash", provider=DeepSeekProvider(openai_client=client), profile=_DEEPSEEK_CHAT_PROFILE
-        )
+    async with configured_model(key, ProviderConfig(), http_client=http_client) as model:
+        yield model
 
 
 async def fetch_review_catalog(key: str, config: ProviderConfig) -> list[str]:

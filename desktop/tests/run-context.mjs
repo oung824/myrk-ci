@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { projectRoot } from './project-paths.mjs'
@@ -150,6 +150,7 @@ export async function finishTestRun(run, result) {
   const results = await projectDirectory(project, join(project, '.scratch', 'check-runs', 'results'))
   const summary = { ...result, ...(owner.task_id ? { task_id: owner.task_id } : {}), project_root: project, source_root: run.source, directory: run.directory, ended: new Date().toISOString(), generatedRemoved: false }
   const reports = []
+  const reportFiles = new Set()
   for (const output of new Set(run.reportPaths ?? [])) {
     if (!existsSync(output)) continue
     const pending = [output]
@@ -159,7 +160,10 @@ export async function finishTestRun(run, result) {
       const item = await lstat(path)
       if (item.isSymbolicLink()) throw new Error('Linked check reports cannot be preserved')
       if (item.isDirectory()) pending.push(...(await readdir(path)).map(name => join(path, name)))
-      else if (item.isFile()) hasFiles = true
+      else if (item.isFile()) {
+        hasFiles = true
+        reportFiles.add(path)
+      }
     }
     if (hasFiles) reports.push(output)
     else await rm(output, { recursive: true })
@@ -169,12 +173,24 @@ export async function finishTestRun(run, result) {
     await projectPath(project, destination)
     await rename(join(run.directory, 'reports'), destination)
     summary.reports = reports.map(path => join(destination, relative(join(run.directory, 'reports'), path)))
+    summary.report_files = [...reportFiles].sort().map(path => join(destination, relative(join(run.directory, 'reports'), path)))
     summary.reportRetention = { owner: 'desktop-check', reason: 'Reports explicitly requested by this check command', delete_when: 'The caller has consumed the reports and the task result is accepted' }
   }
   if (result.result === 0) {
     await rm(run.directory, { recursive: true })
     summary.generatedRemoved = true
   } else {
+    summary.failure_logs = []
+    for (const name of ['context-contract', 'build', 'vitest'].flatMap(command => [
+      command + '-stdout.txt', command + '-stderr.txt',
+    ])) {
+      const path = join(run.directory, name)
+      if (!existsSync(path)) continue
+      if (!(await lstat(path)).isFile()) throw new Error(`Invalid check log: ${path}`)
+      const original = join(results, `desktop-${basename(run.directory)}.${name}`)
+      await copyFile(path, original)
+      summary.failure_logs.push(original)
+    }
     for (const entry of await readdir(run.directory, { withFileTypes: true })) {
       if (entry.name !== 'fixtures' && (entry.isDirectory() || entry.isSymbolicLink())) await rm(join(run.directory, entry.name), { recursive: true, force: true })
     }
