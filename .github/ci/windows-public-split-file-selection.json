@@ -1,0 +1,119 @@
+{
+  "file-receipts": {
+    "file": "tests/acceptance/test_files_calculation_checks.py",
+    "count": 22,
+    "node_ids_sha256": "e0bc3d10c90afa3c889fcc4fbcef40280aa7a23ceda8c1d199800826d1a6ed70",
+    "node_ids": [
+      "tests/acceptance/test_files_calculation_checks.py::test_changed_file_after_check_cannot_be_reported_as_current_verified_version",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-not-executed-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-not-executed-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-not-executed-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-version-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-version-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-version-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-command-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-command-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-command-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-input-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-input-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-input-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-output-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-output-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-output-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-script-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-script-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_check_claims_require_actual_version_command_and_output[check-wrong-script-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_missing_check_receipt_blocks_the_public_evidence_chain[deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_missing_check_receipt_blocks_the_public_evidence_chain[google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_missing_check_receipt_blocks_the_public_evidence_chain[openai-chat]"
+    ]
+  },
+  "file-effects-and-decimal": {
+    "file": "tests/acceptance/test_files_calculation_checks.py",
+    "count": 18,
+    "node_ids_sha256": "49781cac9bfb4c3db70edd9b83d3839297573632f01406b0a8494255266e5d9c",
+    "node_ids": [
+      "tests/acceptance/test_files_calculation_checks.py::test_exact_decimal_uses_independent_gold_and_keeps_invalid_attempt[calculation-invalid-recovery-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_exact_decimal_uses_independent_gold_and_keeps_invalid_attempt[calculation-invalid-recovery-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_exact_decimal_uses_independent_gold_and_keeps_invalid_attempt[calculation-invalid-recovery-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_exact_decimal_uses_independent_gold_and_keeps_invalid_attempt[calculation-wrong-answer-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_exact_decimal_uses_independent_gold_and_keeps_invalid_attempt[calculation-wrong-answer-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_exact_decimal_uses_independent_gold_and_keeps_invalid_attempt[calculation-wrong-answer-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-no-change-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-no-change-false-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-no-change-false-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-no-change-false-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-no-change-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-no-change-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-version-changed-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-version-changed-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-version-changed-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-wrong-target-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-wrong-target-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_unchanged_or_wrong_version_is_never_a_new_deliverable[file-wrong-target-openai-chat]"
+    ]
+  },
+  "file-command-effects": {
+    "file": "tests/acceptance/test_files_calculation_checks.py",
+    "count": 18,
+    "node_ids_sha256": "082852fd2573c5ebedc7f5eb8f69c29413d55d97de88599f32288bb60bfed930",
+    "node_ids": [
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-failure-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-failure-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-failure-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-recovery-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-recovery-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-recovery-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-stop-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-stop-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-stop-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-timeout-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-timeout-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_command_partial_effects_and_original_errors_survive_failure_and_recovery[command-timeout-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_explicit_check_before_change_cannot_be_replaced_by_same_final_bytes[check-after-command-false-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_explicit_check_before_change_cannot_be_replaced_by_same_final_bytes[check-after-command-false-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_explicit_check_before_change_cannot_be_replaced_by_same_final_bytes[check-after-command-false-openai-chat]",
+      "tests/acceptance/test_files_calculation_checks.py::test_explicit_check_before_change_cannot_be_replaced_by_same_final_bytes[check-before-command-deepseek]",
+      "tests/acceptance/test_files_calculation_checks.py::test_explicit_check_before_change_cannot_be_replaced_by_same_final_bytes[check-before-command-google]",
+      "tests/acceptance/test_files_calculation_checks.py::test_explicit_check_before_change_cannot_be_replaced_by_same_final_bytes[check-before-command-openai-chat]"
+    ]
+  },
+  "approval-authorization": {
+    "file": "tests/acceptance/test_approval_modes.py",
+    "count": 15,
+    "node_ids_sha256": "c1d2c5971b0ac77d1e1fddfab904c843ae53b51af0340c8074d2abdfbdf4291d",
+    "node_ids": [
+      "tests/acceptance/test_approval_modes.py::test_changed_authorization_invalidates_the_old_allow_decision[deepseek]",
+      "tests/acceptance/test_approval_modes.py::test_changed_authorization_invalidates_the_old_allow_decision[google]",
+      "tests/acceptance/test_approval_modes.py::test_changed_authorization_invalidates_the_old_allow_decision[openai-chat]",
+      "tests/acceptance/test_approval_modes.py::test_changed_material_cannot_receive_the_prepared_edit[deepseek]",
+      "tests/acceptance/test_approval_modes.py::test_changed_material_cannot_receive_the_prepared_edit[google]",
+      "tests/acceptance/test_approval_modes.py::test_changed_material_cannot_receive_the_prepared_edit[openai-chat]",
+      "tests/acceptance/test_approval_modes.py::test_full_access_material_cannot_grant_task_authority_or_hide_wrong_effect[deepseek]",
+      "tests/acceptance/test_approval_modes.py::test_full_access_material_cannot_grant_task_authority_or_hide_wrong_effect[google]",
+      "tests/acceptance/test_approval_modes.py::test_full_access_material_cannot_grant_task_authority_or_hide_wrong_effect[openai-chat]",
+      "tests/acceptance/test_approval_modes.py::test_late_authorization_does_not_erase_an_already_observed_violation[deepseek]",
+      "tests/acceptance/test_approval_modes.py::test_late_authorization_does_not_erase_an_already_observed_violation[google]",
+      "tests/acceptance/test_approval_modes.py::test_late_authorization_does_not_erase_an_already_observed_violation[openai-chat]",
+      "tests/acceptance/test_approval_modes.py::test_ordinary_goal_failure_is_not_automatically_a_critical_violation[deepseek]",
+      "tests/acceptance/test_approval_modes.py::test_ordinary_goal_failure_is_not_automatically_a_critical_violation[google]",
+      "tests/acceptance/test_approval_modes.py::test_ordinary_goal_failure_is_not_automatically_a_critical_violation[openai-chat]"
+    ]
+  },
+  "approval-stop-and-readonly": {
+    "file": "tests/acceptance/test_approval_modes.py",
+    "count": 9,
+    "node_ids_sha256": "b685bc475d695885ccec884cad7769b8be2abcaa4913ffc383880f59f32e45a1",
+    "node_ids": [
+      "tests/acceptance/test_approval_modes.py::test_missing_effect_original_remains_unknown_after_stop[deepseek]",
+      "tests/acceptance/test_approval_modes.py::test_missing_effect_original_remains_unknown_after_stop[google]",
+      "tests/acceptance/test_approval_modes.py::test_missing_effect_original_remains_unknown_after_stop[openai-chat]",
+      "tests/acceptance/test_approval_modes.py::test_readonly_access_blocks_native_file_and_command_writes[deepseek]",
+      "tests/acceptance/test_approval_modes.py::test_readonly_access_blocks_native_file_and_command_writes[google]",
+      "tests/acceptance/test_approval_modes.py::test_readonly_access_blocks_native_file_and_command_writes[openai-chat]",
+      "tests/acceptance/test_approval_modes.py::test_stop_checks_inflight_partial_effect_and_starts_nothing_later[deepseek]",
+      "tests/acceptance/test_approval_modes.py::test_stop_checks_inflight_partial_effect_and_starts_nothing_later[google]",
+      "tests/acceptance/test_approval_modes.py::test_stop_checks_inflight_partial_effect_and_starts_nothing_later[openai-chat]"
+    ]
+  }
+}

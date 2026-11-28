@@ -6,7 +6,7 @@ on:
       focus:
         description: Run the four reproduced cases, full files, or integrated runner checks
         type: choice
-        options: [cases, files, integrated, artifact, auxiliary]
+        options: [cases, files, integrated, artifact, auxiliary, file-behavior]
         default: cases
 
 permissions:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   diagnosis:
-    if: inputs.focus != 'artifact' && inputs.focus != 'auxiliary'
+    if: inputs.focus != 'artifact' && inputs.focus != 'auxiliary' && inputs.focus != 'file-behavior'
     name: Diagnose ${{ matrix.name }}
     runs-on: windows-11-arm
     timeout-minutes: 12
@@ -187,4 +187,38 @@ jobs:
           MYRK_AUX_DIGEST: ${{ matrix.digest }}
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-auxiliary.py' $env:MYRK_AUX_GROUP $env:MYRK_AUX_COUNT $env:MYRK_AUX_DIGEST
+          exit $LASTEXITCODE
+
+  file-behavior:
+    name: Offline behavior ${{ matrix.group }}
+    if: inputs.focus == 'file-behavior'
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [file-receipts, file-effects-and-decimal, file-command-effects, approval-authorization, approval-stop-and-readonly]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Prepare the synthetic report index
+        run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+      - name: Verify exact offline behavior and recovery
+        env:
+          MYRK_CI_SPLIT_GROUP: ${{ matrix.group }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-split-file-behavior.py' $env:MYRK_CI_SPLIT_GROUP
           exit $LASTEXITCODE
