@@ -6,7 +6,7 @@ on:
       focus:
         description: Scope of the synthetic acceptance run
         type: choice
-        options: [all, additional, initial, local-scoring, question-review, delegation-compaction]
+        options: [all, additional, initial, local-scoring, question-review, delegation-compaction, integrated-fixtures]
         default: all
 
 permissions:
@@ -15,6 +15,7 @@ permissions:
 jobs:
   acceptance:
     name: Acceptance ${{ matrix.group }}
+    if: inputs.focus != 'integrated-fixtures'
     runs-on: windows-11-arm
     timeout-minutes: 20
     strategy:
@@ -53,4 +54,56 @@ jobs:
           MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
         run: |
           & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_ACCEPTANCE_GROUP
+          exit $LASTEXITCODE
+
+  integrated-fixtures:
+    name: Acceptance ${{ matrix.group }}
+    if: inputs.focus == 'integrated-fixtures'
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {group: audited-delegation-fixtures, expected_count: '44', node_digest: '22a8e8098140d048d305a3d465511869f31f8a042856c0e7ccffc9725b6454eb'}
+          - {group: audited-compaction-fixtures, expected_count: '28', node_digest: 'a0139696920881e9f42ede06d77585b731e3aaedb6b57118d1ac2af918a92b16'}
+          - {group: audited-native-fixtures, expected_count: '20', node_digest: '82c6a70a02a6b03b1bb6db18386a6f542e4042b10cde38e76999ab6aef9aea8a'}
+          - {group: audited-review-fixtures, expected_count: '24', node_digest: 'de33a928840a47c316e8fc709fa8239b6a897445e51e6036a71424baff25dd53'}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the public snapshot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install locked Python dependencies and verify the fixed executor
+        run: >-
+          & 'C:\Program Files\PowerShell\7\pwsh.exe' -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass
+          -File .github/ci/windows-pilot.ps1 -Phase install -Check backend-executor
+      - name: Prepare the synthetic fixture catalogue
+        env:
+          MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
+        run: |
+          $index = 'tests/acceptance/materials/history/index.json'
+          if (Test-Path -LiteralPath $index) { throw 'Synthetic history must use a new file' }
+          New-Item -ItemType Directory -Path (Split-Path -Parent $index) -Force -ErrorAction Stop | Out-Null
+          Copy-Item -LiteralPath '.github/ci/fixtures/empty-acceptance-history.json' -Destination $index
+          if ($env:MYRK_CI_ACCEPTANCE_GROUP -eq 'audited-delegation-fixtures') {
+            $delegation = 'tests/acceptance/materials/delegation'
+            if (Test-Path -LiteralPath $delegation) { throw 'Synthetic delegation must use a new directory' }
+            New-Item -ItemType Directory -Path $delegation -ErrorAction Stop | Out-Null
+          }
+          if ($env:MYRK_CI_ACCEPTANCE_GROUP -eq 'audited-compaction-fixtures') {
+            $compaction = 'tests/acceptance/materials/compaction/inputs.json'
+            if (Test-Path -LiteralPath $compaction) { throw 'Synthetic compaction must use a new file' }
+            Set-Content -LiteralPath $compaction -Value '{}' -Encoding utf8NoBOM -ErrorAction Stop
+          }
+      - name: Verify the audited manifest and run the selected synthetic tests
+        env:
+          MYRK_CI_ACCEPTANCE_GROUP: ${{ matrix.group }}
+          MYRK_CI_COUNT: ${{ matrix.expected_count }}
+          MYRK_CI_NODE_DIGEST: ${{ matrix.node_digest }}
+        run: |
+          & '.venv/Scripts/python.exe' -B '.github/ci/windows-public-backend.py' $env:MYRK_CI_ACCEPTANCE_GROUP --expected-count $env:MYRK_CI_COUNT --expected-node-digest $env:MYRK_CI_NODE_DIGEST
           exit $LASTEXITCODE

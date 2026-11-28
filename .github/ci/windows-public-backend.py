@@ -166,6 +166,10 @@ AUDITED_GROUPS = {
     ),
     'audited-local-scoring': GROUPS['synthetic-local-scoring'],
     'audited-judge': GROUPS['judge-fixtures'],
+    'audited-delegation-fixtures': ('acceptance/test_delegation',),
+    'audited-compaction-fixtures': ('acceptance/test_compaction',),
+    'audited-native-fixtures': ('acceptance/test_native_stream_close', 'acceptance/test_runtime_diagnostics', 'acceptance/test_legacy_reasoning_off', 'acceptance/test_reply_stream_lifecycle'),
+    'audited-review-fixtures': ('acceptance/test_action_failure_matching', 'acceptance/test_question_review', 'acceptance/test_files_calculation_checks', 'acceptance/test_review_refactor_behavior', 'acceptance/test_review_contract_triggers'),
 }
 AUDITED_DESELECT = {
     'audited-synthetic-qualification': (
@@ -173,6 +177,28 @@ AUDITED_DESELECT = {
         + DESELECT['synthetic-review-and-cancellation']
     ),
     'audited-local-scoring': DESELECT['synthetic-local-scoring'],
+    'audited-delegation-fixtures': DESELECT['synthetic-delegation'],
+    'audited-compaction-fixtures': DESELECT['synthetic-compaction'],
+}
+AUDITED_SELECTION = {
+    'audited-native-fixtures': (
+        'tests/acceptance/test_native_stream_close.py',
+        'tests/acceptance/test_runtime_diagnostics.py',
+        'tests/acceptance/test_legacy_reasoning_off.py',
+        'tests/acceptance/test_reply_stream_lifecycle.py::test_native_mock_response_close_records_only_actual_body_progress',
+        'tests/acceptance/test_reply_stream_lifecycle.py::test_complete_native_sdk_reply_keeps_decoded_response_evidence',
+    ),
+    'audited-review-fixtures': (
+        'tests/acceptance/test_action_failure_matching.py',
+        'tests/acceptance/test_question_review.py::test_shared_critical_dimension_requires_each_declared_output_type',
+        'tests/acceptance/test_files_calculation_checks.py::test_native_check_receipt_binds_executed_command_input_version_and_output',
+        'tests/acceptance/test_files_calculation_checks.py::test_receipt_observation_preserves_access_and_does_not_follow_retargeted_paths',
+        'tests/acceptance/test_review_refactor_behavior.py::test_task_continuation_preserves_spent_work_and_selects_only_current_inputs',
+        'tests/acceptance/test_review_refactor_behavior.py::test_public_native_service_continuation_preserves_the_old_turn_and_step',
+        'tests/acceptance/test_review_refactor_behavior.py::test_invalid_invoice_source_keeps_the_public_unsupported_fallback',
+        'tests/acceptance/test_review_contract_triggers.py::test_memory_stop_contract_receiver_keeps_failed_and_missing_distinct',
+        'tests/acceptance/test_review_contract_triggers.py::test_memory_without_a_stop_branch_keeps_no_trigger_na',
+    ),
 }
 DIAGNOSTIC_FILES = {
     'test_action_reporting_facts': 'executor-and-network',
@@ -391,7 +417,7 @@ def main():
     if arguments.diagnostic_file:
         names = (arguments.diagnostic_file,)
     paths = tuple(f'tests/{name}.py' for name in names)
-    selection = paths
+    selection = AUDITED_SELECTION.get(group, paths)
     if arguments.failed_cases_only:
         selection = tuple(f'{paths[0]}::{node}' for node in DIAGNOSTIC_CASES[arguments.diagnostic_file])
     exclusions = AUDITED_DESELECT.get(group, DESELECT.get(group, ()))
